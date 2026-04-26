@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J-V Recap Maker - V36</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        /* --- VARIABLES GLOBALES --- */
+        :root {
+            --bg-body: #f0f2f5;
+            --container-bg: #ffffff;
+            --accent-blue: #1f538d;
+            --accent-hover: #163b65;
+            --success-green: #228b22;
+            --text-main: #2c3e50;
+            --text-dim: #7f8c8d;
+            --border-color: #dcdde1;
+            --console-bg: #121212;
+        }
+
+        /* --- BASE --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1100px;
+            background-color: var(--container-bg);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        /* --- HEADER --- */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--accent-blue);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        .header-left, .header-right { flex: 1; }
+        .header-center { flex: 2; text-align: center; }
+        h1 { font-size: 20px; margin: 0; color: var(--accent-blue); text-align: left; }
+        
+        #seriesTitle {
+            font-size: 24px;
+            font-weight: bold;
+            color: black;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            width: 100%;
+            padding: 5px;
+        }
+        #seriesTitle:focus { outline: none; border-bottom: 2px dashed var(--accent-blue); }
+
+        /* --- BOUTONS & CONTROLES --- */
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+        .btn-blue { background-color: var(--accent-blue); }
+        .btn-green { background-color: var(--success-green); }
+        .btn-purple { background-color: #8e44ad; }
+        .btn-red { background-color: #e74c3c; }
+        .btn-outline { background: white; color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+        .btn-outline.active { background: var(--accent-blue); color: white; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        input[type="file"] { display: none; }
+
+        /* --- NAVIGATION ONGLETS --- */
+        .tab-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            align-items: center;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-dim);
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .tab-btn.active { color: white; background: var(--accent-blue); }
+        .tab-right { margin-left: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* --- SELECTEURS --- */
+        .selector-box { margin-bottom: 20px; display: none; flex-direction: column; gap: 12px; }
+        .selector-row { display: flex; align-items: center; gap: 15px; }
+        .selector-label { font-size: 12px; font-weight: bold; color: var(--text-dim); text-transform: uppercase; width: 110px; }
+        .surface-btn, .cond-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border-color);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .surface-btn.active, .cond-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        /* --- TABLEAUX PUBLICATION --- */
+        .preview-card { margin-top: 10px; padding: 20px; background: white; }
+        table.pub-table { width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; color: black; font-size: 15px; }
+        .pub-table thead { border-top: 1px solid black; border-bottom: 1px solid black; }
+        .pub-table tbody { border-bottom: 1px solid black; }
+        .pub-table th, .pub-table td { padding: 10px 8px; text-align: center; border: none; }
+        .pub-table th { font-weight: bold; }
+        .pub-table td:first-child { text-align: left; }
+        .pub-table tr.excluded-row { opacity: 0.35; }
+        .pub-table tr.excluded-row td { background-color: #fceaea !important; }
+        .footnote { font-family: 'Times New Roman', Times, serif; font-style: italic; font-size: 14px; margin-top: 8px; color: black; }
+
+        /* --- GRAPHIQUES --- */
+        .grid-2x2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; margin-top: 20px; }
+        .stat-plot { width: 460px; height: 350px; background: white; }
+        #jvPlot { width: 660px; height: 500px; }
+
+        /* --- CONSOLE LOG --- */
+        .console-wrapper { margin-top: 30px; }
+        #logConsole {
+            width: 100%; height: 100px; background-color: var(--console-bg); color: #00ff41;
+            font-family: 'Consolas', monospace; font-size: 12px; padding: 12px; border-radius: 4px;
+            overflow-y: auto; box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <header>
+        <div class="header-left">
+            <h1>J-V Recap Maker</h1>
+        </div>
+        <div class="header-center">
+            <input type="text" id="seriesTitle" value="Untitled Series" title="Edit the PDF title">
+        </div>
+        <div class="header-right"></div>
+    </header>
+
+    <div class="controls-row">
+        <div>
+            <label for="folderInput" class="btn btn-blue">📁 Import Processed Data</label>
+            <input type="file" id="folderInput" webkitdirectory directory multiple>
+            <span id="pathDisplay" style="font-size: 12px; color: var(--text-dim); margin-left: 15px;">No folder selected</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button id="exportBtn" class="btn btn-green" disabled>Export Recap CSV</button>
+            <button id="exportPdfBtn" class="btn btn-red" disabled>📄 Export PDF</button>
+        </div>
+    </div>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" id="btn-pub" onclick="switchTab('tab-pub')">Publication & Curves</button>
+        <button class="tab-btn" id="btn-stat" onclick="switchTab('tab-stat')">Statistics Data</button>
+        <button class="tab-btn tab-right" id="btn-filter" onclick="switchTab('tab-filter')">Data Filtering</button>
+    </div>
+
+    <div id="globalSelectors" class="selector-box">
+        <div class="selector-row">
+            <span class="selector-label">Surface:</span>
+            <div id="surfaceBtns"></div>
+        </div>
+        <div id="condSelectorRow" class="selector-row" style="display:none;">
+            <span class="selector-label">Condition:</span>
+            <div id="condBtns"></div>
+        </div>
+    </div>
+
+    <div id="tab-pub" class="tab-content active">
+        <div class="preview-card">
+            <table class="pub-table">
+                <thead>
+                    <tr>
+                        <th>Condition</th>
+                        <th>Voc (V)</th>
+                        <th>Jsc (mA/cm²)</th>
+                        <th>FF (%)</th>
+                        <th>PCE (%)</th>
+                        <th>Best PCE (%)</th>
+                        <th>Number of cells</th>
+                    </tr>
+                </thead>
+                <tbody id="pubBody">
+                    <tr><td colspan="7" style="color:#ccc; font-style:italic; padding:20px; text-align:center;">No data loaded</td></tr>
+                </tbody>
+            </table>
+            <div id="footnotePub" class="footnote"></div>
+            <div style="display:flex; justify-content: center; margin-top:30px;">
+                <div id="jvPlot"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-stat" class="tab-content">
+        <div class="preview-card" style="padding: 10px;">
+            <div class="grid-2x2">
+                <div id="statPlotVoc" class="stat-plot"></div>
+                <div id="statPlotJsc" class="stat-plot"></div>
+                <div id="statPlotFF" class="stat-plot"></div>
+                <div id="statPlotPCE" class="stat-plot"></div>
+            </div>
+            <div id="footnoteStat" class="footnote" style="text-align: center; margin-top:20px;"></div>
+            <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px dashed #ccc;">
+                <button id="exportStatBtn" class="btn btn-purple" disabled>📊 Export Stat.csv (All Parameters)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-filter" class="tab-content">
+        <div class="preview-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin:0; font-family: 'Times New Roman';">Cell Filtering & Heatmap</h3>
+                <button id="toggleHeatmap" class="btn btn-outline active">Heatmap: ON</button>
+            </div>
+            <table class="pub-table" id="filterTable">
+                <thead>
+                    <tr>
+                        <th>Motif</th>
+                        <th>Voc (V)</th>
+                        <th>Jsc (mA/cm²)</th>
+                        <th>FF (%)</th>
+                        <th>PCE (%)</th>
+                        <th style="width: 80px;">Exclude</th>
+                    </tr>
+                </thead>
+                <tbody id="filterBody"></tbody>
+            </table>
+            <div id="footnoteFilter" class="footnote"></div>
+        </div>
+    </div>
+
+    <div class="console-wrapper">
+        <div id="logConsole">Waiting for data import...</div>
+    </div>
+</div>
+
+<script>
+    /* =========================================================
+       1. VARIABLES GLOBALES & CONFIGURATIONS
+       ========================================================= */
+    let globalData = {};
+    let globalCurves = {};
+    let uniqueSurfaces = [];
+    let currentSurface = null;
+    let currentCondition = null; 
+    let excludedSet = new Set(); 
+    let heatmapActive = true; 
+
+    const customPalette = ['#4D4D4D', '#EF3B39', '#1C73F3', '#32A85D', '#B67EE2', '#C29701', '#00C7CE', '#7B504A', '#8A9404', '#FA6900', '#72A1D3', '#7CBD1E'];
+    const digits = { voc: 3, jsc: 1, ff: 1, pce: 1 };
+    const heatmapColors = [ '#F06565', '#F17167', '#F27D69', '#F3896B', '#F4956D', '#F5A16F', '#F6AD71', '#F7B973', '#F8C575', '#F9D177', '#FADD79', '#FBE97B', '#ECF17D', '#DDEF7F', '#CEEC81', '#BFEA83', '#B0E885', '#A1E587', '#92E389', '#83E18B', '#74DE8D', '#65DC8F' ];
+
+    // Éléments du DOM
+    const logConsole = document.getElementById('logConsole');
+    const folderInput = document.getElementById('folderInput');
+    const exportBtn = document.getElementById('exportBtn');
+    const exportStatBtn = document.getElementById('exportStatBtn');
+    const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const surfaceBtnsDiv = document.getElementById('surfaceBtns');
+    const condBtnsDiv = document.getElementById('condBtns');
+    const pubBody = document.getElementById('pubBody');
+    const filterBody = document.getElementById('filterBody');
+    const toggleHeatmap = document.getElementById('toggleHeatmap');
+    const pathDisplay = document.getElementById('pathDisplay');
+    const seriesTitle = document.getElementById('seriesTitle');
+
+    /* =========================================================
+       2. UTILITAIRES (Maths, Logs, Couleurs)
+       ========================================================= */
+    function log(msg, color = '#00ff41') {
+        const cleanMsg = msg.replace(/_/g, ' ');
+        const time = new Date().toLocaleTimeString();
+        if (logConsole.innerText.includes("Waiting")) logConsole.innerHTML = "";
+        logConsole.innerHTML += `<div style="color:${color}">[${time}] ${cleanMsg}</div>`;
+        logConsole.scrollTop = logConsole.scrollHeight;
+    }
+
+    function calcStats(vals) {
+        const valid = vals.filter(v => v !== null && !isNaN(v));
+        if (valid.length === 0) return { m: 0, sd: 0, count: 0 };
+        const m = valid.reduce((a, b) => a + b, 0) / valid.length;
+        const sd = Math.sqrt(valid.reduce((acc, x) => acc + Math.pow(x - m, 2), 0) / (valid.length - 1)) || 0;
+        return { m, sd, count: valid.length };
+    }
+
+    function getHeatmapColor(val, min, max) {
+        if (!heatmapActive || min === max || isNaN(val) || val === null) return "";
+        let ratio = (val - min) / (max - min); 
+        ratio = Math.max(0, Math.min(1, ratio)); 
+        let index = Math.round(ratio * (heatmapColors.length - 1));
+        return heatmapColors[index];
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.getElementById('btn-' + tabId.split('-')[1]).classList.add('active');
+        document.getElementById('condSelectorRow').style.display = (tabId === 'tab-filter') ? 'flex' : 'none';
+        if (Object.keys(globalData).length > 0) renderUI(); else renderEmptyPlots(); 
+    }
+
+    /* =========================================================
+       3. ORIGIN GRAPH FACTORY (Le Noyau de Génération)
+       ========================================================= */
+    function createOriginLayout(opt) {
+        const fontConfig = { family: 'Arial', color: '#000000' };
+        
+        let layout = {
+            width: opt.width,
+            height: opt.height,
+            margin: opt.margin,
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white',
+            showlegend: opt.showlegend || false,
+            font: fontConfig,
+            xaxis: {
+                title: opt.xTitle ? `<b>${opt.xTitle}</b>` : '',
+                titlefont: { size: opt.titleFontSize || 18, family: 'Arial', color: '#000000' },
+                tickfont: { size: opt.tickFontSize || 14, family: 'Arial', color: '#000000' },
+                showline: true, linewidth: 2, linecolor: 'black', mirror: true,
+                ticks: 'inside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black',
+                showgrid: false, zeroline: false, color: '#000000'
+            },
+            yaxis: {
+                title: opt.yTitle ? `<b>${opt.yTitle}</b>` : '',
+                titlefont: { size: opt.titleFontSize || 18, family: 'Arial', color: '#000000' },
+                tickfont: { size: opt.tickFontSize || 14, family: 'Arial', color: '#000000' },
+                showline: true, linewidth: 2, linecolor: 'black', mirror: true,
+                ticks: 'inside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black',
+                showgrid: false, zeroline: false, color: '#000000'
+            }
+        };
+
+        if (opt.showlegend) {
+            layout.legend = { x: 0.05, y: 0.95, font: { family: 'Arial', size: 14, color: '#000000' }, bgcolor: 'transparent' };
+        }
+
+        // Ranges stricts
+        if (opt.xRange) { layout.xaxis.range = opt.xRange; layout.xaxis.autorange = false; }
+        if (opt.yRange) { layout.yaxis.range = opt.yRange; layout.yaxis.autorange = false; }
+
+        // Ticks (Conditionally applied ONLY if data/yRange exists to prevent black bar bug)
+        if (opt.xTick && opt.xRange) layout.xaxis.dtick = opt.xTick;
+        if (opt.xMinorTick && opt.xRange) layout.xaxis.minor = { dtick: opt.xMinorTick, ticks: 'inside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 1.5, tickcolor: 'black' };
+        
+        if (opt.yTick && opt.yRange) layout.yaxis.dtick = opt.yTick;
+        if (opt.yMinorTick && opt.yRange) layout.yaxis.minor = { dtick: opt.yMinorTick, ticks: 'inside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 1.5, tickcolor: 'black' };
+
+        // Format Décimales
+        if (opt.xFormat) layout.xaxis.tickformat = opt.xFormat;
+        if (opt.yFormat) layout.yaxis.tickformat = opt.yFormat;
+
+        // Croix de zéro (pour le JV)
+        if (opt.zeroLines && opt.xRange && opt.yRange) {
+            layout.shapes = [
+                { type: 'line', x0: opt.xRange[0], x1: opt.xRange[1], y0: 0, y1: 0, line: { color: 'black', width: 2 } },
+                { type: 'line', x0: 0, x1: 0, y0: opt.yRange[0], y1: opt.yRange[1], line: { color: 'black', width: 2 } }
+            ];
+        }
+
+        return layout;
+    }
+
+    function getJVLayout() {
+        return createOriginLayout({
+            width: 660, height: 500, margin: { l: 70, r: 30, t: 30, b: 70 },
+            showlegend: true, xTitle: 'Voltage (V)', yTitle: 'J (mA/cm²)',
+            xRange: [-0.5, 1.0], yRange: [-30, 30],
+            xTick: 0.2, xMinorTick: 0.1, yTick: 5, yMinorTick: 1,
+            yFormat: '.0f', // Fix: 0 décimales pour le J-V (ex: 25 au lieu de 25.00)
+            zeroLines: true
+        });
+    }
+
+    function getStatLayout(yTitle, tickFormat, dtickMaj, dtickMin, yRange = null) {
+        return createOriginLayout({
+            width: 460, height: 350, margin: { l: 60, r: 20, t: 30, b: 49 },
+            showlegend: false, yTitle: yTitle,
+            yRange: yRange, // Indique si on a des datas ou un graphe vide
+            yTick: dtickMaj, yMinorTick: dtickMin, yFormat: tickFormat,
+            titleFontSize: 16, tickFontSize: 12, tickLen: 5, tickWidth: 1.5
+        });
+    }
+
+    function buildJVPlotConfig(surf) {
+        let traces = []; let colorIdx = 0;
+        Object.keys(globalData).sort().forEach(cond => {
+            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
+            if (validCells.length === 0) return;
+            const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
+            const color = customPalette[colorIdx % customPalette.length];
+            if (globalCurves[cond]) {
+                const x = [], y = [];
+                globalCurves[cond].forEach(pt => { 
+                    const keys = Object.keys(pt);
+                    if(pt[keys[0]] !== undefined && pt[champ['Motif']] !== undefined) { x.push(pt[keys[0]]); y.push(pt[champ['Motif']]); }
+                });
+                if(x.length > 0) traces.push({ x, y, name: cond.replace(/_/g, ' '), mode: 'lines', line: { color, width: 2 } });
+            }
+            colorIdx++;
+        });
+        return { data: traces, layout: getJVLayout() };
+    }
+
+    function buildStatPlotConfig(surf, pName, dtickMaj, dtickMin, tickFmt) {
+        let traces = []; let allVals = []; let colorIdx = 0;
+        Object.keys(globalData).sort().forEach(cond => {
+            const valid = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
+            if (valid.length === 0) return;
+            const color = customPalette[colorIdx % customPalette.length];
+            let vals = valid.map(c => c[pName]).filter(v => v !== null && !isNaN(v));
+            allVals.push(...vals);
+            traces.push({ y: vals, name: cond.replace(/_/g, ' '), type: 'box', boxpoints: 'all', jitter: 0.3, pointpos: 0, marker: { color: '#000000', size: 4 }, fillcolor: color, line: { color: '#000000', width: 1.5 }, width: 0.3 });
+            colorIdx++;
+        });
+
+        let layoutRange = null;
+        if (allVals.length > 0) {
+            let mn = Math.min(...allVals), mx = Math.max(...allVals);
+            let padding = Math.max(Math.abs(mn) * 0.015, 0.005);
+            layoutRange = [mn - padding, mx + padding];
+        }
+        
+        let layout = getStatLayout(pName, tickFmt, dtickMaj, dtickMin, layoutRange);
+        return { data: traces, layout };
+    }
+
+    /* =========================================================
+       4. FONCTIONS DE RENDU DANS L'INTERFACE (Render)
+       ========================================================= */
+    function renderEmptyPlots() {
+        Plotly.react('jvPlot', [], getJVLayout(), { staticPlot: true, responsive: false });
+        Plotly.react('statPlotVoc', [], getStatLayout('Voc (V)', '.2f', 0.01, 0.005), { staticPlot: true, responsive: false });
+        Plotly.react('statPlotJsc', [], getStatLayout('Jsc (mA/cm²)', '.1f', 0.5, 0.1), { staticPlot: true, responsive: false });
+        Plotly.react('statPlotFF', [], getStatLayout('FF (%)', '.1f', 1, 0.5), { staticPlot: true, responsive: false });
+        Plotly.react('statPlotPCE', [], getStatLayout('PCE (%)', '.1f', 0.5, 0.1), { staticPlot: true, responsive: false });
+    }
+
+    function renderUI() {
+        const sortedConds = Object.keys(globalData).sort();
+        surfaceBtnsDiv.innerHTML = "";
+        uniqueSurfaces.forEach(s => {
+            const b = document.createElement('button');
+            b.className = `surface-btn ${s === currentSurface ? 'active' : ''}`;
+            b.innerText = `${s.toFixed(2)} cm²`;
+            b.onclick = () => { currentSurface = s; renderUI(); };
+            surfaceBtnsDiv.appendChild(b);
+        });
+
+        condBtnsDiv.innerHTML = "";
+        sortedConds.forEach(c => {
+            const b = document.createElement('button');
+            b.className = `cond-btn ${c === currentCondition ? 'active' : ''}`;
+            b.innerText = c.replace(/_/g, ' ');
+            b.onclick = () => { currentCondition = c; renderUI(); };
+            condBtnsDiv.appendChild(b);
+        });
+
+        const activeTab = document.querySelector('.tab-btn.active').id;
+        if (activeTab === 'btn-filter') renderFilterTab();
+        else if (activeTab === 'btn-pub') renderPubTab();
+        else if (activeTab === 'btn-stat') renderStatTab();
+    }
+
+    function renderFilterTab() {
+        filterBody.innerHTML = "";
+        document.getElementById('footnoteFilter').innerText = `Showing all cells for: ${currentCondition.replace(/_/g, ' ')} | Area: ${currentSurface.toFixed(2)} cm²`;
+        const rows = globalData[currentCondition].filter(r => r['Surface (cm²)'] === currentSurface);
+        
+        const getRange = (p) => {
+            const validRows = rows.filter(r => !excludedSet.has(`${currentCondition}|${currentSurface}|${r['Motif']}`));
+            const vals = validRows.map(r => r[p]).filter(v => v !== null && !isNaN(v));
+            if (vals.length === 0) return { min: 0, max: 0 };
+            return { min: Math.min(...vals), max: Math.max(...vals) };
+        };
+        const ranges = { voc: getRange('Voc (V)'), jsc: getRange('Jsc (mA/cm²)'), ff: getRange('FF (%)'), pce: getRange('PCE (%)') };
+
+        rows.forEach(r => {
+            const motif = r['Motif'];
+            const key = `${currentCondition}|${currentSurface}|${motif}`;
+            const isExcluded = excludedSet.has(key);
+            const tr = document.createElement('tr');
+            if (isExcluded) tr.className = 'excluded-row';
+
+            const bgVoc = isExcluded ? "" : getHeatmapColor(r['Voc (V)'], ranges.voc.min, ranges.voc.max);
+            const bgJsc = isExcluded ? "" : getHeatmapColor(r['Jsc (mA/cm²)'], ranges.jsc.min, ranges.jsc.max);
+            const bgFF  = isExcluded ? "" : getHeatmapColor(r['FF (%)'], ranges.ff.min, ranges.ff.max);
+            const bgPCE = isExcluded ? "" : getHeatmapColor(r['PCE (%)'], ranges.pce.min, ranges.pce.max);
+
+            const safeRender = (val, dec) => (val !== null && !isNaN(val)) ? val.toFixed(dec) : '--';
+            tr.innerHTML = `<td>${motif}</td><td style="background:${bgVoc}">${safeRender(r['Voc (V)'], 3)}</td><td style="background:${bgJsc}">${safeRender(r['Jsc (mA/cm²)'], 1)}</td><td style="background:${bgFF}">${safeRender(r['FF (%)'], 1)}</td><td style="background:${bgPCE}">${safeRender(r['PCE (%)'], 1)}</td><td><input type="checkbox" ${isExcluded ? 'checked' : ''} onchange="toggleCell('${key}', '${currentCondition}', ${currentSurface}, '${motif}')"></td>`;
+            filterBody.appendChild(tr);
+        });
+    }
+
+    function renderPubTab() {
+        pubBody.innerHTML = ""; document.getElementById('footnotePub').innerText = `Active Area: ${currentSurface.toFixed(2)} cm²`;
+        Object.keys(globalData).sort().forEach(cond => {
+            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === currentSurface && !excludedSet.has(`${cond}|${currentSurface}|${c['Motif']}`));
+            if (validCells.length === 0) return;
+            
+            const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
+            const sV = calcStats(validCells.map(c => c['Voc (V)']));
+            const sJ = calcStats(validCells.map(c => c['Jsc (mA/cm²)']));
+            const sF = calcStats(validCells.map(c => c['FF (%)']));
+            const sP = calcStats(validCells.map(c => c['PCE (%)']));
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${cond.replace(/_/g, ' ')}</td><td>${sV.m.toFixed(3)} ± ${sV.sd.toFixed(3)}</td><td>${sJ.m.toFixed(1)} ± ${sJ.sd.toFixed(1)}</td><td>${sF.m.toFixed(1)} ± ${sF.sd.toFixed(1)}</td><td>${sP.m.toFixed(1)} ± ${sP.sd.toFixed(1)}</td><td><b>${champ['PCE (%)'] ? champ['PCE (%)'].toFixed(1) : '--'}</b></td><td>${validCells.length}</td>`;
+            pubBody.appendChild(tr);
+        });
+        const jvConfig = buildJVPlotConfig(currentSurface);
+        Plotly.react('jvPlot', jvConfig.data, jvConfig.layout, { staticPlot: true });
+    }
+
+    function renderStatTab() {
+        document.getElementById('footnoteStat').innerText = `Active Area: ${currentSurface.toFixed(2)} cm²`;
+        
+        const cV = buildStatPlotConfig(currentSurface, 'Voc (V)', 0.01, 0.005, '.2f');
+        const cJ = buildStatPlotConfig(currentSurface, 'Jsc (mA/cm²)', 0.5, 0.1, '.1f');
+        const cF = buildStatPlotConfig(currentSurface, 'FF (%)', 1, 0.5, '.1f');
+        const cP = buildStatPlotConfig(currentSurface, 'PCE (%)', 0.5, 0.1, '.1f');
+        
+        Plotly.react('statPlotVoc', cV.data, cV.layout, { staticPlot: true, responsive: false });
+        Plotly.react('statPlotJsc', cJ.data, cJ.layout, { staticPlot: true, responsive: false });
+        Plotly.react('statPlotFF', cF.data, cF.layout, { staticPlot: true, responsive: false });
+        Plotly.react('statPlotPCE', cP.data, cP.layout, { staticPlot: true, responsive: false });
+    }
+
+    /* =========================================================
+       5. GESTION DES EVENEMENTS (Load, Fichiers, Boutons)
+       ========================================================= */
+    window.onload = renderEmptyPlots;
+
+    folderInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        const parentName = files[0].webkitRelativePath.split('/')[0];
+        pathDisplay.innerText = `Folder: ${parentName}`;
+        seriesTitle.value = parentName.replace(/_/g, ' '); 
+        
+        log(`Analyzing folder...`, '#3498db');
+        globalData = {}; globalCurves = {}; excludedSet.clear();
+        let sSet = new Set();
+
+        const recapFiles = files.filter(f => f.name.endsWith('_Recap.csv') && !f.name.includes('Raw'));
+        const mesureFiles = files.filter(f => f.name.endsWith('_Mesures.csv'));
+
+        for (let file of recapFiles) {
+            const cond = file.name.replace('_Recap.csv', '');
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+            if (lines.length < 2) continue;
+            const headers = lines[0].split('\t');
+            globalData[cond] = lines.slice(1).map(l => {
+                const v = l.split('\t');
+                let o = {};
+                headers.forEach((h, i) => {
+                    let val = v[i];
+                    if (val === undefined || val.trim() === '') { o[h] = null; } 
+                    else { let parsed = parseFloat(val.replace(',', '.')); o[h] = !isNaN(parsed) ? parsed : val; }
+                });
+                return o;
+            });
+            globalData[cond].forEach(r => { if(r['Surface (cm²)']) sSet.add(r['Surface (cm²)']) });
+        }
+
+        for (let file of mesureFiles) {
+            const cond = file.name.replace('_Mesures.csv', '');
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+            if (lines.length < 2) continue;
+            const headers = lines[0].split('\t');
+            globalCurves[cond] = lines.slice(1).map(l => {
+                const v = l.split('\t');
+                let o = {};
+                headers.forEach((h, i) => o[h] = parseFloat(v[i].replace(',','.')));
+                return o;
+            });
+        }
+
+        uniqueSurfaces = Array.from(sSet).sort((a,b) => a-b);
+        if (uniqueSurfaces.length > 0) {
+            currentSurface = uniqueSurfaces[0];
+            currentCondition = Object.keys(globalData).sort()[0];
+            document.getElementById('globalSelectors').style.display = 'flex';
+            
+            const activeTab = document.querySelector('.tab-btn.active').id;
+            document.getElementById('condSelectorRow').style.display = (activeTab === 'btn-filter') ? 'flex' : 'none';
+
+            renderUI();
+            exportBtn.disabled = false; exportStatBtn.disabled = false; exportPdfBtn.disabled = false;
+            log("Import complete.", "#2ecc71");
+        }
+    });
+
+    toggleHeatmap.onclick = () => {
+        heatmapActive = !heatmapActive;
+        toggleHeatmap.innerText = heatmapActive ? "Heatmap: ON" : "Heatmap: OFF";
+        toggleHeatmap.classList.toggle('active');
+        renderUI();
+    };
+
+    window.toggleCell = (key, condName, surfValue, motifName) => {
+        const cleanCond = condName.replace(/_/g, ' ');
+        if (excludedSet.has(key)) { 
+            excludedSet.delete(key); 
+            log(`[Re-Included] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#3498db'); 
+        } else { 
+            excludedSet.add(key); 
+            log(`[Excluded] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#e74c3c'); 
+        }
+        renderUI();
+    };
+
+    /* =========================================================
+       6. EXPORTATIONS (CSV & PDF)
+       ========================================================= */
+    function buildTableDataForSurface(surf) {
+        let tableData = [];
+        Object.keys(globalData).sort().forEach(cond => {
+            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
+            if (validCells.length === 0) return;
+            const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
+            
+            const vS = calcStats(validCells.map(c => c['Voc (V)']));
+            const jS = calcStats(validCells.map(c => c['Jsc (mA/cm²)']));
+            const fS = calcStats(validCells.map(c => c['FF (%)']));
+            const pS = calcStats(validCells.map(c => c['PCE (%)']));
+
+            tableData.push([
+                cond.replace(/_/g, ' '),
+                `${vS.m.toFixed(3)} ± ${vS.sd.toFixed(3)}`, `${jS.m.toFixed(1)} ± ${jS.sd.toFixed(1)}`,
+                `${fS.m.toFixed(1)} ± ${fS.sd.toFixed(1)}`, `${pS.m.toFixed(1)} ± ${pS.sd.toFixed(1)}`,
+                champ['PCE (%)'].toFixed(1), validCells.length.toString()
+            ]);
+        });
+        return tableData;
+    }
+
+    exportPdfBtn.onclick = async () => {
+        exportPdfBtn.innerText = "⏳ Generating...";
+        exportPdfBtn.disabled = true;
+        log("Compiling Optimized PDF... Please wait.", "#f1c40f");
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4'); 
+            const title = seriesTitle.value || "Untitled Series";
+
+            for (let i = 0; i < uniqueSurfaces.length; i++) {
+                let surf = uniqueSurfaces[i];
+                if (i > 0) doc.addPage();
+                
+                // PAGE A
+                doc.setFont('times', 'bold'); doc.setFontSize(20);
+                doc.text(title, 105, 20, { align: 'center' });
+                doc.setFontSize(14); doc.setFont('times', 'italic');
+                doc.text(`Area: ${surf.toFixed(2)} cm² - Publication Recap`, 105, 28, { align: 'center' });
+
+                const tableData = buildTableDataForSurface(surf);
+                doc.autoTable({
+                    startY: 38,
+                    head: [['Condition', 'Voc (V)', 'Jsc (mA/cm²)', 'FF (%)', 'PCE (%)', 'Best PCE (%)', 'Cells']],
+                    body: tableData,
+                    theme: 'plain',
+                    styles: { font: 'times', fontSize: 10, halign: 'center', textColor: 0, cellPadding: 2 },
+                    headStyles: { fontStyle: 'bold' },
+                    didDrawPage: function(data) { }
+                });
+                
+                const finalY = doc.lastAutoTable.finalY;
+                const headHeight = doc.lastAutoTable.head[0].height;
+                doc.setLineWidth(0.2); doc.line(14, 38, 196, 38); 
+                doc.setLineWidth(0.2); doc.line(14, 38 + headHeight, 196, 38 + headHeight); 
+                doc.setLineWidth(0.2); doc.line(14, finalY, 196, finalY); 
+
+                const jvConfig = buildJVPlotConfig(surf);
+                if (jvConfig.data.length > 0) {
+                    const jvImg = await Plotly.toImage(jvConfig, {format: 'jpeg', width: 700, height: 500, scale: 3}); 
+                    doc.addImage(jvImg, 'JPEG', 35, finalY + 15, 140, 100); 
+                }
+
+                // PAGE B
+                doc.addPage();
+                doc.setFont('times', 'bold'); doc.setFontSize(20);
+                doc.text(title, 105, 20, { align: 'center' });
+                doc.setFontSize(14); doc.setFont('times', 'italic');
+                doc.text(`Area: ${surf.toFixed(2)} cm² - Statistical Distributions`, 105, 28, { align: 'center' });
+
+                const sV = buildStatPlotConfig(surf, 'Voc (V)', 0.01, 0.005, '.2f');
+                const sJ = buildStatPlotConfig(surf, 'Jsc (mA/cm²)', 0.5, 0.1, '.1f');
+                const sF = buildStatPlotConfig(surf, 'FF (%)', 1, 0.5, '.1f');
+                const sP = buildStatPlotConfig(surf, 'PCE (%)', 0.5, 0.1, '.1f');
+
+                if (sV.data.length > 0) {
+                    const [imgV, imgJ, imgF, imgP] = await Promise.all([
+                        Plotly.toImage(sV, {format: 'jpeg', width: 460, height: 350, scale: 3}),
+                        Plotly.toImage(sJ, {format: 'jpeg', width: 460, height: 350, scale: 3}),
+                        Plotly.toImage(sF, {format: 'jpeg', width: 460, height: 350, scale: 3}),
+                        Plotly.toImage(sP, {format: 'jpeg', width: 460, height: 350, scale: 3})
+                    ]);
+                    const w = 85, h = 65; 
+                    doc.addImage(imgV, 'JPEG', 15, 40, w, h);
+                    doc.addImage(imgJ, 'JPEG', 110, 40, w, h);
+                    doc.addImage(imgF, 'JPEG', 15, 115, w, h);
+                    doc.addImage(imgP, 'JPEG', 110, 115, w, h);
+                }
+            }
+            doc.save(`Recap_${title.replace(/\s+/g, '_')}.pdf`);
+            log("Optimized PDF exported successfully.", "success");
+        } catch (error) {
+            console.error(error);
+            log("Error generating PDF.", "#e74c3c");
+        } finally {
+            exportPdfBtn.innerText = "📄 Export PDF";
+            exportPdfBtn.disabled = false;
+        }
+    };
+
+    exportStatBtn.onclick = () => { 
+        log("Generating filtered Stat.csv...", "#f1c40f");
+        const conditions = Object.keys(globalData).sort();
+        const params = ['Voc (V)', 'Jsc (mA/cm²)', 'FF (%)', 'PCE (%)'];
+        let allCols = []; let maxR = 0;
+
+        params.forEach((param, pIdx) => {
+            conditions.forEach(cond => {
+                let surfs = new Set(); globalData[cond].forEach(c => surfs.add(c['Surface (cm²)']));
+                Array.from(surfs).sort((a,b)=>a-b).forEach(s => {
+                    let col = [param, cond.replace(/_/g, ' '), s.toFixed(2) + 'cm2'];
+                    globalData[cond].filter(c => c['Surface (cm²)'] === s && !excludedSet.has(`${cond}|${s}|${c['Motif']}`)).forEach(c => {
+                        let dec = digits[param.split(' ')[0].toLowerCase()];
+                        let val = c[param];
+                        col.push((val !== null && !isNaN(val)) ? val.toFixed(dec) : '');
+                    });
+                    if (col.length > maxR) maxR = col.length;
+                    allCols.push(col);
+                });
+            });
+            if (pIdx < params.length - 1) allCols.push(['', '', '']);
+        });
+
+        allCols.forEach(c => { while(c.length < maxR) c.push(''); });
+        let rows = []; for(let i=0; i<maxR; i++) { let r = []; for(let j=0; j<allCols.length; j++) r.push(allCols[j][i]); rows.push(r.join('\t')); }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(["\uFEFF" + rows.join('\n')], {type:'text/csv'})); a.download = "Stat.csv"; a.click();
+        log("Filtered Stat.csv exported.", "success");
+    };
+
+    exportBtn.onclick = () => { 
+        log("Generating filtered Complete Recap...", "#f1c40f");
+        const conditions = Object.keys(globalData).sort();
+        const COL_PER_COND = 11;
+        let grid = [];
+        const addRow = () => { let r = new Array(conditions.length * (COL_PER_COND + 1)).fill(''); grid.push(r); return grid.length - 1; };
+
+        let groupMap = {};
+        let maxSurfs = 0, maxCells = 0;
+        conditions.forEach(c => {
+            let surfs = {};
+            const valid = globalData[c].filter(cell => !excludedSet.has(`${c}|${cell['Surface (cm²)']}|${cell['Motif']}`));
+            valid.forEach(cell => {
+                let s = cell['Surface (cm²)'];
+                if (!surfs[s]) surfs[s] = [];
+                surfs[s].push(cell);
+            });
+            let sortedS = Object.keys(surfs).map(Number).sort((a,b)=>a-b);
+            maxSurfs = Math.max(maxSurfs, sortedS.length);
+            maxCells = Math.max(maxCells, valid.length);
+            groupMap[c] = { sortedS, surfs, raw: valid.sort((a,b) => a['Surface (cm²)'] - b['Surface (cm²)']) };
+        });
+
+        let r0 = addRow();
+        conditions.forEach((c, idx) => {
+            let start = idx * (COL_PER_COND + 1);
+            grid[r0][start] = c.replace(/_/g, ' ');
+            ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)','Number of cells'].forEach((h, i) => grid[r0][start+1+i] = h);
+        });
+
+        for (let i = 0; i < maxSurfs; i++) {
+            let r = addRow();
+            conditions.forEach((c, idx) => {
+                let start = idx * (COL_PER_COND + 1);
+                let info = groupMap[c];
+                if (i < info.sortedS.length) {
+                    let s = info.sortedS[i], list = info.surfs[s];
+                    
+                    const vS = calcStats(list.map(x => x['Voc (V)']));
+                    const jS = calcStats(list.map(x => x['Jsc (mA/cm²)']));
+                    const fS = calcStats(list.map(x => x['FF (%)']));
+                    const pS = calcStats(list.map(x => x['PCE (%)']));
+                    const rsS = calcStats(list.map(x => x['Rserie (Ω.cm²)']));
+                    const rshS = calcStats(list.map(x => x['Rshunt (Ω.cm²)']));
+                    const rs2S = calcStats(list.map(x => x['Rserie (Ω)']));
+                    const rsh2S = calcStats(list.map(x => x['Rshunt (Ω)']));
+
+                    grid[r][start+1] = vS.count ? `${vS.m.toFixed(3)} ± ${vS.sd.toFixed(3)}` : '';
+                    grid[r][start+2] = jS.count ? `${jS.m.toFixed(1)} ± ${jS.sd.toFixed(1)}` : '';
+                    grid[r][start+3] = fS.count ? `${fS.m.toFixed(1)} ± ${fS.sd.toFixed(1)}` : '';
+                    grid[r][start+4] = pS.count ? `${pS.m.toFixed(1)} ± ${pS.sd.toFixed(1)}` : '';
+                    grid[r][start+5] = rsS.count ? `${rsS.m.toFixed(2)} ± ${rsS.sd.toFixed(2)}` : '';
+                    grid[r][start+6] = rshS.count ? `${rshS.m.toFixed(1)} ± ${rshS.sd.toFixed(1)}` : '';
+                    grid[r][start+7] = rs2S.count ? `${rs2S.m.toFixed(2)} ± ${rs2S.sd.toFixed(2)}` : '';
+                    grid[r][start+8] = rsh2S.count ? `${rsh2S.m.toFixed(1)} ± ${rsh2S.sd.toFixed(1)}` : '';
+                    grid[r][start+9] = s.toFixed(2);
+                    grid[r][start+10] = list.length;
+                }
+            });
+        }
+        addRow(); 
+
+        let rS2H = addRow();
+        conditions.forEach((c, idx) => {
+            let start = idx * (COL_PER_COND + 1);
+            ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)','Number of cells'].forEach((h, i) => grid[rS2H][start+1+i] = h);
+        });
+        
+        for (let i = 0; i < maxSurfs; i++) {
+            let rM = addRow(), rSD = addRow();
+            conditions.forEach((c, idx) => {
+                let start = idx * (COL_PER_COND + 1);
+                let info = groupMap[c];
+                if (i < info.sortedS.length) {
+                    let s = info.sortedS[i], list = info.surfs[s];
+                    grid[rM][start] = 'Mean'; grid[rSD][start] = 'Standard Deviation';
+                    ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)'].forEach((p, pi) => {
+                        let st = calcStats(list.map(x => x[p]));
+                        if(st.count > 0) {
+                            let dec = pi === 0 ? 3 : (pi === 2 ? 1 : 2);
+                            grid[rM][start+1+pi] = st.m.toFixed(dec); grid[rSD][start+1+pi] = st.sd.toFixed(dec);
+                        }
+                    });
+                    grid[rM][start+9] = s.toFixed(2); grid[rM][start+10] = list.length;
+                }
+            });
+        }
+        addRow();
+
+        let rS3H = addRow();
+        conditions.forEach((c, idx) => {
+            let start = idx * (COL_PER_COND + 1);
+            grid[rS3H][start] = 'Motif';
+            ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)'].forEach((h, i) => grid[rS3H][start+1+i] = h);
+        });
+        
+        for (let i = 0; i < maxCells; i++) {
+            let rRaw = addRow();
+            conditions.forEach((c, idx) => {
+                let start = idx * (COL_PER_COND + 1);
+                let raw = groupMap[c].raw;
+                if (i < raw.length) {
+                    let cell = raw[i];
+                    grid[rRaw][start] = cell['Motif'];
+                    ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)'].forEach((p, pi) => {
+                        let dec = pi === 0 ? 3 : (pi === 2 ? 1 : 2);
+                        if(cell[p] !== null && !isNaN(cell[p])) grid[rRaw][start+1+pi] = cell[p].toFixed(dec);
+                    });
+                }
+            });
+        }
+
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(["\uFEFF" + grid.map(r => r.join('\t')).join('\n')], {type:'text/csv'})); a.download = "Complete Recap.csv"; a.click();
+        log("Filtered Complete Recap exported.", "success");
+    };
+</script>
+</body>
+</html>
