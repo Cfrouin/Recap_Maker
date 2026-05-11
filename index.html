@@ -1,14 +1,14 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>J-V Recap Maker - V36</title>
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    
-    <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>J-V Recap Tool 1.6</title>
+<script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
         /* --- VARIABLES GLOBALES --- */
         :root {
             --bg-body: #f0f2f5;
@@ -35,11 +35,12 @@
 
         .main-container {
             width: 100%;
-            max-width: 1100px;
+            max-width: 1400px;
             background-color: var(--container-bg);
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: max-width 0.3s;
         }
 
         /* --- HEADER --- */
@@ -51,7 +52,8 @@
             padding-bottom: 15px;
             margin-bottom: 15px;
         }
-        .header-left, .header-right { flex: 1; }
+        .header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
+        .header-right { flex: 1; }
         .header-center { flex: 2; text-align: center; }
         h1 { font-size: 20px; margin: 0; color: var(--accent-blue); text-align: left; }
         
@@ -65,8 +67,17 @@
             font-family: inherit;
             width: 100%;
             padding: 5px;
+            box-sizing: border-box;
         }
         #seriesTitle:focus { outline: none; border-bottom: 2px dashed var(--accent-blue); }
+
+        #orderBtn, #saveBtn {
+            background: none; border: none; font-size: 22px; cursor: pointer;
+            padding: 0; transition: transform 0.3s;
+        }
+        #orderBtn:hover:not(:disabled) { transform: rotate(45deg); }
+        #saveBtn:hover:not(:disabled) { transform: scale(1.1); }
+        #orderBtn:disabled, #saveBtn:disabled { opacity: 0.3; cursor: not-allowed; }
 
         /* --- BOUTONS & CONTROLES --- */
         .controls-row {
@@ -94,29 +105,37 @@
         .btn-green { background-color: var(--success-green); }
         .btn-purple { background-color: #8e44ad; }
         .btn-red { background-color: #e74c3c; }
+        .btn-orange { background-color: #e67e22; }
+        .btn-gray { background-color: #6c757d; }
         .btn-outline { background: white; color: var(--accent-blue); border: 1px solid var(--accent-blue); }
         .btn-outline.active { background: var(--accent-blue); color: white; }
         .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
         input[type="file"] { display: none; }
 
+        /* --- MODAL --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 450px; max-width: 90%; max-height: 80vh; overflow-y: auto;}
+        
+        .order-item { 
+            display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; 
+            background: #f8f9fa; border: 1px solid var(--border-color); 
+            border-radius: 4px; margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        .order-item.draggable { cursor: grab; }
+        .order-item.draggable:active { cursor: grabbing; }
+        .order-item.dragging { opacity: 0.4; background: #e0e0e0; }
+        .order-item.drag-over { border: 2px dashed var(--accent-blue); background: #e9ecef; }
+        .drag-handle { font-weight: bold; color: var(--text-dim); margin-right: 15px; font-size: 18px; pointer-events: auto; cursor: grab;}
+
         /* --- NAVIGATION ONGLETS --- */
         .tab-nav {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-            align-items: center;
+            display: flex; gap: 10px; margin-bottom: 25px;
+            border-bottom: 2px solid #eee; padding-bottom: 10px; align-items: center;
         }
         .tab-btn {
-            padding: 10px 20px;
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-dim);
-            background: transparent;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+            padding: 10px 20px; font-size: 14px; font-weight: 700; color: var(--text-dim);
+            background: transparent; border: none; border-radius: 4px; cursor: pointer;
         }
         .tab-btn.active { color: white; background: var(--accent-blue); }
         .tab-right { margin-left: auto; }
@@ -128,13 +147,8 @@
         .selector-row { display: flex; align-items: center; gap: 15px; }
         .selector-label { font-size: 12px; font-weight: bold; color: var(--text-dim); text-transform: uppercase; width: 110px; }
         .surface-btn, .cond-btn {
-            padding: 6px 14px;
-            border: 1px solid var(--border-color);
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
+            padding: 6px 14px; border: 1px solid var(--border-color); background: white;
+            border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;
         }
         .surface-btn.active, .cond-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
 
@@ -148,12 +162,71 @@
         .pub-table td:first-child { text-align: left; }
         .pub-table tr.excluded-row { opacity: 0.35; }
         .pub-table tr.excluded-row td { background-color: #fceaea !important; }
-        .footnote { font-family: 'Times New Roman', Times, serif; font-style: italic; font-size: 14px; margin-top: 8px; color: black; }
+        .footnote { font-family: 'Times New Roman', Times, serif; font-size: 14px; margin-top: 8px; color: black; }
 
         /* --- GRAPHIQUES --- */
-        .grid-2x2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; margin-top: 20px; }
+        .plots-container { display: flex; justify-content: center; gap: 20px; margin-top: 30px; flex-wrap: wrap; }
+        /* Grille Statistics : 2x2 à largeur fixe et centrée (Option 2A) */
+        .grid-2x2 {
+            display: grid;
+            grid-template-columns: 460px 460px;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            margin-top: 20px;
+        }
         .stat-plot { width: 460px; height: 350px; background: white; }
-        #jvPlot { width: 660px; height: 500px; }
+        .jv-plot-box { width: 660px; height: 500px; }
+
+        /* Conteneur relatif pour positionner le bouton d'export par-dessus chaque graphe.
+           Le bouton est calé dans le coin supérieur droit du cadre Plotly (à l'intérieur des
+           marges définies dans le layout : margin.t et margin.r). */
+        .plot-wrapper { position: relative; }
+        .plot-export-btn {
+            position: absolute;
+            z-index: 5;
+            width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--accent-blue);
+            opacity: 0.35;
+            transition: opacity 0.2s, background 0.2s, transform 0.2s;
+            padding: 0;
+        }
+        .plot-wrapper:hover .plot-export-btn { opacity: 1; }
+        .plot-export-btn:hover {
+            background: var(--accent-blue);
+            color: white;
+            transform: scale(1.08);
+        }
+        .plot-export-btn:disabled {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .plot-export-btn.copied {
+            background: #27ae60 !important;
+            color: white !important;
+            border-color: #27ae60 !important;
+            opacity: 1 !important;
+            transform: scale(1.08);
+        }
+        .plot-export-btn.downloading {
+            background: var(--accent-blue) !important;
+            color: white !important;
+            opacity: 1 !important;
+        }
+        /* Variantes de positionnement selon les marges Plotly de chaque type de graphe.
+           Le bouton est posé à 4px à l'intérieur du coin haut-droit du cadre tracé.
+           - J-V       : margin top=20, right=20 → bouton à top:24px, right:24px
+           - EQE       : margin top=20, right=60 (2e axe Y) → top:24px, right:64px
+           - Statistics: margin top=30, right=20 → top:34px, right:24px */
+        .plot-export-btn.pos-jv  { top: 24px; right: 24px; }
+        .plot-export-btn.pos-eqe { top: 24px; right: 64px; }
+        .plot-export-btn.pos-stat { top: 34px; right: 24px; }
 
         /* --- CONSOLE LOG --- */
         .console-wrapper { margin-top: 30px; }
@@ -165,139 +238,194 @@
     </style>
 </head>
 <body>
-
-<div class="main-container">
-    <header>
-        <div class="header-left">
-            <h1>J-V Recap Maker</h1>
-        </div>
-        <div class="header-center">
-            <input type="text" id="seriesTitle" value="Untitled Series" title="Edit the PDF title">
-        </div>
-        <div class="header-right"></div>
-    </header>
-
-    <div class="controls-row">
-        <div>
-            <label for="folderInput" class="btn btn-blue">📁 Import Processed Data</label>
-            <input type="file" id="folderInput" webkitdirectory directory multiple>
-            <span id="pathDisplay" style="font-size: 12px; color: var(--text-dim); margin-left: 15px;">No folder selected</span>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button id="exportBtn" class="btn btn-green" disabled>Export Recap CSV</button>
-            <button id="exportPdfBtn" class="btn btn-red" disabled>📄 Export PDF</button>
-        </div>
-    </div>
-
-    <div class="tab-nav">
-        <button class="tab-btn active" id="btn-pub" onclick="switchTab('tab-pub')">Publication & Curves</button>
-        <button class="tab-btn" id="btn-stat" onclick="switchTab('tab-stat')">Statistics Data</button>
-        <button class="tab-btn tab-right" id="btn-filter" onclick="switchTab('tab-filter')">Data Filtering</button>
-    </div>
-
-    <div id="globalSelectors" class="selector-box">
-        <div class="selector-row">
-            <span class="selector-label">Surface:</span>
-            <div id="surfaceBtns"></div>
-        </div>
-        <div id="condSelectorRow" class="selector-row" style="display:none;">
-            <span class="selector-label">Condition:</span>
-            <div id="condBtns"></div>
-        </div>
-    </div>
-
-    <div id="tab-pub" class="tab-content active">
-        <div class="preview-card">
-            <table class="pub-table">
-                <thead>
-                    <tr>
-                        <th>Condition</th>
-                        <th>Voc (V)</th>
-                        <th>Jsc (mA/cm²)</th>
-                        <th>FF (%)</th>
-                        <th>PCE (%)</th>
-                        <th>Best PCE (%)</th>
-                        <th>Number of cells</th>
-                    </tr>
-                </thead>
-                <tbody id="pubBody">
-                    <tr><td colspan="7" style="color:#ccc; font-style:italic; padding:20px; text-align:center;">No data loaded</td></tr>
-                </tbody>
-            </table>
-            <div id="footnotePub" class="footnote"></div>
-            <div style="display:flex; justify-content: center; margin-top:30px;">
-                <div id="jvPlot"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="tab-stat" class="tab-content">
-        <div class="preview-card" style="padding: 10px;">
-            <div class="grid-2x2">
-                <div id="statPlotVoc" class="stat-plot"></div>
-                <div id="statPlotJsc" class="stat-plot"></div>
-                <div id="statPlotFF" class="stat-plot"></div>
-                <div id="statPlotPCE" class="stat-plot"></div>
-            </div>
-            <div id="footnoteStat" class="footnote" style="text-align: center; margin-top:20px;"></div>
-            <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px dashed #ccc;">
-                <button id="exportStatBtn" class="btn btn-purple" disabled>📊 Export Stat.csv (All Parameters)</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="tab-filter" class="tab-content">
-        <div class="preview-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin:0; font-family: 'Times New Roman';">Cell Filtering & Heatmap</h3>
-                <button id="toggleHeatmap" class="btn btn-outline active">Heatmap: ON</button>
-            </div>
-            <table class="pub-table" id="filterTable">
-                <thead>
-                    <tr>
-                        <th>Motif</th>
-                        <th>Voc (V)</th>
-                        <th>Jsc (mA/cm²)</th>
-                        <th>FF (%)</th>
-                        <th>PCE (%)</th>
-                        <th style="width: 80px;">Exclude</th>
-                    </tr>
-                </thead>
-                <tbody id="filterBody"></tbody>
-            </table>
-            <div id="footnoteFilter" class="footnote"></div>
-        </div>
-    </div>
-
-    <div class="console-wrapper">
-        <div id="logConsole">Waiting for data import...</div>
-    </div>
+<div class="main-container" id="mainContainer">
+<header>
+<div class="header-left">
+<button disabled="" id="saveBtn" onclick="saveSession()" title="Save App Session (HTML)">💾</button>
+<button disabled="" id="orderBtn" onclick="openOrderModal()" title="Settings / Edit Names &amp; Order">⚙️</button>
+<h1>J-V Recap Tool 1.6</h1>
 </div>
-
+<div class="header-center">
+<input id="seriesTitle" title="Edit the PDF title" type="text" value="Untitled Series"/>
+</div>
+<div class="header-right"></div>
+</header>
+<div class="controls-row">
+<div style="display: flex; gap: 10px; align-items: center;">
+<label class="btn btn-blue" for="folderInput">📁 Import Processed Data</label>
+<input directory="" id="folderInput" multiple="" type="file" webkitdirectory=""/>
+<button class="btn btn-orange" disabled="" id="openEqeModalBtn" onclick="openEqeModal()">📈 Import EQE</button>
+<span id="pathDisplay" style="font-size: 12px; color: var(--text-dim); margin-left: 15px;">No folder selected</span>
+</div>
+<div style="display: flex; gap: 10px;">
+<button class="btn btn-green" disabled="" id="exportBtn">Export Recap CSV</button>
+<button class="btn btn-red" disabled="" id="exportPdfBtn">📄 Export PDF</button>
+</div>
+</div>
+<div class="modal" id="orderModal">
+<div class="modal-content">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+<h3 style="margin:0; color: var(--accent-blue);">⚙️ Settings / Order</h3>
+<button onclick="document.getElementById('orderModal').style.display='none'" style="border:none; background:none; font-size:20px; cursor:pointer;">×</button>
+</div>
+<div style="margin-bottom: 15px;">
+<label style="font-size:12px; font-weight:bold; color:var(--text-dim);">Table Column Header:</label>
+<input id="conditionHeaderInput" style="width:100%; box-sizing:border-box; padding:8px; margin-top:5px; border:1px solid var(--border-color); border-radius:4px; font-family:inherit;" type="text"/>
+</div>
+<p style="font-size: 12px; color: var(--text-dim); margin-top: 0;">Rename your conditions and drag items to reorder them.</p>
+<div id="orderList" style="display: flex; flex-direction: column; margin-bottom: 20px;"></div>
+<button class="btn btn-blue" onclick="applyOrder()" style="width: 100%;">Apply Changes</button>
+</div>
+</div>
+<div class="modal" id="eqeModal">
+<div class="modal-content">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+<h3 style="margin:0; color: #e67e22;">📈 Attach EQE Data</h3>
+</div>
+<p style="font-size: 12px; color: var(--text-dim); margin-top: 0;">Upload the corresponding EQE CSV file for each condition.</p>
+<div id="eqeList" style="display: flex; flex-direction: column; margin-bottom: 20px;"></div>
+<button class="btn btn-green" onclick="closeEqeModal()" style="width: 100%;">Done</button>
+</div>
+</div>
+<div class="tab-nav">
+<button class="tab-btn active" id="btn-pub" onclick="switchTab('tab-pub')">Publications</button>
+<button class="tab-btn" id="btn-stat" onclick="switchTab('tab-stat')">Statistics Data</button>
+<button class="tab-btn tab-right" id="btn-filter" onclick="switchTab('tab-filter')">Data Filtering</button>
+</div>
+<div class="selector-box" id="globalSelectors">
+<div class="selector-row">
+<span class="selector-label">Surface:</span>
+<div id="surfaceBtns"></div>
+</div>
+<div class="selector-row" id="condSelectorRow" style="display:none;">
+<span class="selector-label" id="condSelectorTitle">Condition:</span>
+<div id="condBtns"></div>
+</div>
+<div class="selector-row" id="condSelectorPubRow" style="display:none;">
+<span class="selector-label">Graphs:</span>
+<div id="condPubBtns"></div>
+</div>
+</div>
+<div class="tab-content active" id="tab-pub">
+<div class="preview-card">
+<table class="pub-table">
+<thead id="pubHead">
+<tr>
+<th id="pubHeadFirstCol">Condition</th>
+<th>Voc (V)</th>
+<th>Jsc (mA/cm²)</th>
+<th>FF (%)</th>
+<th>PCE (%)</th>
+<th>Best PCE (%)</th>
+<th>Number of cells</th>
+</tr>
+</thead>
+<tbody id="pubBody">
+<tr><td colspan="7" style="color:#ccc; font-style:italic; padding:20px; text-align:center;">No data loaded</td></tr>
+</tbody>
+</table>
+<div class="footnote" id="footnotePub"></div>
+<div class="plots-container" id="plotsContainer">
+<div class="plot-wrapper">
+<button class="plot-export-btn pos-jv" onclick="exportSingleGraph('jvPlot')" title="Export this graph as PNG">⬇</button>
+<div class="jv-plot-box" id="jvPlot"></div>
+</div>
+<div class="plot-wrapper" id="eqePlotWrapper" style="display:none;">
+<button class="plot-export-btn pos-eqe" onclick="exportSingleGraph('eqePlot')" title="Export this graph as PNG">⬇</button>
+<div class="jv-plot-box" id="eqePlot"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="tab-content" id="tab-stat">
+<div class="preview-card" style="padding: 10px;">
+<div class="grid-2x2">
+<div class="plot-wrapper">
+<button class="plot-export-btn pos-stat" onclick="exportSingleGraph('statPlotVoc')" title="Export this graph as PNG">⬇</button>
+<div class="stat-plot" id="statPlotVoc"></div>
+</div>
+<div class="plot-wrapper">
+<button class="plot-export-btn pos-stat" onclick="exportSingleGraph('statPlotJsc')" title="Export this graph as PNG">⬇</button>
+<div class="stat-plot" id="statPlotJsc"></div>
+</div>
+<div class="plot-wrapper">
+<button class="plot-export-btn pos-stat" onclick="exportSingleGraph('statPlotFF')" title="Export this graph as PNG">⬇</button>
+<div class="stat-plot" id="statPlotFF"></div>
+</div>
+<div class="plot-wrapper">
+<button class="plot-export-btn pos-stat" onclick="exportSingleGraph('statPlotPCE')" title="Export this graph as PNG">⬇</button>
+<div class="stat-plot" id="statPlotPCE"></div>
+</div>
+</div>
+<div class="footnote" id="footnoteStat" style="text-align: center; font-style:italic; margin-top:20px;"></div>
+<div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border: 1px dashed #ccc;">
+<button class="btn btn-purple" disabled="" id="exportStatBtn">📊 Export Stat.csv (All Parameters)</button>
+</div>
+</div>
+</div>
+<div class="tab-content" id="tab-filter">
+<div class="preview-card">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+<h3 style="margin:0; font-family: 'Times New Roman';">Cell Filtering &amp; Heatmap</h3>
+<button class="btn btn-outline active" id="toggleHeatmap">Heatmap: ON</button>
+</div>
+<table class="pub-table" id="filterTable">
+<thead>
+<tr>
+<th>Motif</th>
+<th>Voc (V)</th>
+<th>Jsc (mA/cm²)</th>
+<th>FF (%)</th>
+<th>PCE (%)</th>
+<th style="width: 80px;">Exclude</th>
+</tr>
+</thead>
+<tbody id="filterBody"></tbody>
+</table>
+<div class="footnote" id="footnoteFilter" style="font-style:italic;"></div>
+</div>
+</div>
+<div class="console-wrapper">
+<div id="logConsole">Waiting for data import...</div>
+</div>
+</div>
+<script id="sessionData" type="application/json"></script>
 <script>
     /* =========================================================
        1. VARIABLES GLOBALES & CONFIGURATIONS
        ========================================================= */
     let globalData = {};
     let globalCurves = {};
+    let globalEQE = {}; 
     let uniqueSurfaces = [];
     let currentSurface = null;
     let currentCondition = null; 
     let excludedSet = new Set(); 
     let heatmapActive = true; 
+    let customOrder = []; 
+    let conditionColumnName = "Condition";
+    // Conditions visibles dans les graphes J-V et EQE de l'onglet Publications.
+    // null = toutes visibles (état initial). Sinon un Set de noms de conditions.
+    let visibleConditionsPub = null;
 
     const customPalette = ['#4D4D4D', '#EF3B39', '#1C73F3', '#32A85D', '#B67EE2', '#C29701', '#00C7CE', '#7B504A', '#8A9404', '#FA6900', '#72A1D3', '#7CBD1E'];
     const digits = { voc: 3, jsc: 1, ff: 1, pce: 1 };
     const heatmapColors = [ '#F06565', '#F17167', '#F27D69', '#F3896B', '#F4956D', '#F5A16F', '#F6AD71', '#F7B973', '#F8C575', '#F9D177', '#FADD79', '#FBE97B', '#ECF17D', '#DDEF7F', '#CEEC81', '#BFEA83', '#B0E885', '#A1E587', '#92E389', '#83E18B', '#74DE8D', '#65DC8F' ];
 
-    // Éléments du DOM
+    // Éléments DOM
     const logConsole = document.getElementById('logConsole');
     const folderInput = document.getElementById('folderInput');
     const exportBtn = document.getElementById('exportBtn');
     const exportStatBtn = document.getElementById('exportStatBtn');
     const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const orderBtn = document.getElementById('orderBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const openEqeModalBtn = document.getElementById('openEqeModalBtn');
     const surfaceBtnsDiv = document.getElementById('surfaceBtns');
     const condBtnsDiv = document.getElementById('condBtns');
+    const condPubBtnsDiv = document.getElementById('condPubBtns');
+    const condSelectorTitle = document.getElementById('condSelectorTitle');
+    const pubHead = document.getElementById('pubHead');
     const pubBody = document.getElementById('pubBody');
     const filterBody = document.getElementById('filterBody');
     const toggleHeatmap = document.getElementById('toggleHeatmap');
@@ -305,7 +433,123 @@
     const seriesTitle = document.getElementById('seriesTitle');
 
     /* =========================================================
-       2. UTILITAIRES (Maths, Logs, Couleurs)
+       2. INITIALISATION & RESTAURATION SESSION (LOAD)
+       ========================================================= */
+    window.onload = () => {
+        renderEmptyPlots();
+        
+        // --- MÉCANIQUE DE RÉHYDRATATION ---
+        const dataScript = document.getElementById('sessionData');
+        if (dataScript && dataScript.textContent.trim() !== "") {
+            try {
+                const savedState = JSON.parse(dataScript.textContent);
+                
+                // Restauration des données profondes
+                globalData = savedState.globalData || {};
+                globalCurves = savedState.globalCurves || {};
+                globalEQE = savedState.globalEQE || {};
+                customOrder = savedState.customOrder || [];
+                excludedSet = new Set(savedState.excludedSet || []);
+                conditionColumnName = savedState.conditionColumnName || "Condition";
+                // Restaurer la sélection de visibilité des graphes Pub (null = toutes visibles)
+                visibleConditionsPub = savedState.visibleConditionsPub
+                    ? new Set(savedState.visibleConditionsPub)
+                    : new Set(customOrder);
+                
+                document.getElementById('seriesTitle').value = savedState.seriesTitle || "Untitled Series";
+                pathDisplay.innerText = "Session Restored";
+
+                if (Object.keys(globalData).length > 0) {
+                    // Re-déduction des surfaces uniques
+                    let sSet = new Set();
+                    Object.keys(globalData).forEach(cond => {
+                        globalData[cond].forEach(r => { if(r['Surface (cm²)']) sSet.add(r['Surface (cm²)']) });
+                    });
+                    uniqueSurfaces = Array.from(sSet).sort((a,b) => a-b);
+                    
+                    if (uniqueSurfaces.length > 0) {
+                        currentSurface = uniqueSurfaces[0];
+                        currentCondition = customOrder.length > 0 ? customOrder[0] : Object.keys(globalData).sort()[0];
+                        
+                        document.getElementById('globalSelectors').style.display = 'flex';
+                        condSelectorTitle.innerText = conditionColumnName + ":";
+                        
+                        const activeTab = document.querySelector('.tab-btn.active').id;
+                        document.getElementById('condSelectorRow').style.display = (activeTab === 'btn-filter') ? 'flex' : 'none';
+                        document.getElementById('condSelectorPubRow').style.display = (activeTab === 'btn-pub') ? 'flex' : 'none';
+
+                        renderUI();
+                        
+                        exportBtn.disabled = false;
+                        exportStatBtn.disabled = false;
+                        exportPdfBtn.disabled = false;
+                        orderBtn.disabled = false;
+                        openEqeModalBtn.disabled = false;
+                        saveBtn.disabled = false;
+                        
+                        log("Saved session loaded successfully. Ready to resume.", "success");
+                    }
+                }
+            } catch(e) {
+                console.error("Error parsing session data:", e);
+                log("Error loading saved session.", "#e74c3c");
+            }
+        }
+    };
+
+    /* =========================================================
+       3. SAUVEGARDE DE SESSION (SAVE)
+       ========================================================= */
+    function saveSession() {
+        log("Packaging app state, please wait...", "#3498db");
+
+        // 1. Capture de l'état actuel
+        const sessionState = {
+            globalData,
+            globalCurves,
+            globalEQE,
+            customOrder,
+            excludedSet: Array.from(excludedSet), // Conversion Set -> Array obligatoire pour le JSON
+            visibleConditionsPub: visibleConditionsPub ? Array.from(visibleConditionsPub) : null,
+            conditionColumnName,
+            seriesTitle: document.getElementById('seriesTitle').value
+        };
+
+        // 2. Injection du JSON
+        let dataScript = document.getElementById('sessionData');
+        dataScript.textContent = JSON.stringify(sessionState);
+
+        // 3. Vidage TEMPORAIRE des graphiques pour alléger le fichier HTML
+        // (Sinon Plotly sauve des milliers de balises SVG en dur dans le fichier)
+        const plotIds = ['jvPlot', 'eqePlot', 'statPlotVoc', 'statPlotJsc', 'statPlotFF', 'statPlotPCE'];
+        plotIds.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = '';
+        });
+
+        // 4. Capture du HTML (Léger car purgé des SVG)
+        let htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+
+        // 5. Restauration instantanée des graphiques pour l'utilisateur
+        renderUI();
+
+        // 6. Téléchargement du fichier
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = sessionState.seriesTitle ? sessionState.seriesTitle.replace(/\s+/g, '_') : 'Session';
+        a.download = `Recap_Tool_${safeName}.html`;
+        a.click();
+        // Fix: libérer l'Object URL pour éviter une fuite mémoire (le blob peut peser plusieurs Mo)
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        log("Session saved as a Standalone HTML app.", "success");
+    }
+
+
+    /* =========================================================
+       4. UTILITAIRES & PARSEURS
        ========================================================= */
     function log(msg, color = '#00ff41') {
         const cleanMsg = msg.replace(/_/g, ' ');
@@ -336,15 +580,271 @@
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         document.getElementById('btn-' + tabId.split('-')[1]).classList.add('active');
+        // Ligne Condition (single-select) : visible seulement dans Data Filtering
         document.getElementById('condSelectorRow').style.display = (tabId === 'tab-filter') ? 'flex' : 'none';
+        // Ligne Graphs (multi-select) : visible seulement dans Publications
+        document.getElementById('condSelectorPubRow').style.display = (tabId === 'tab-pub') ? 'flex' : 'none';
         if (Object.keys(globalData).length > 0) renderUI(); else renderEmptyPlots(); 
     }
 
+    function parseEQE(text) {
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lines.length < 2) return null;
+        
+        const headerLine = lines[0];
+        const headers = headerLine.split('\t').map(h => h.trim());
+        const isInterp = headerLine.includes('_Interp');
+        
+        let idxWL = -1, idxEQE = -1, idxJsc = -1;
+        
+        if (isInterp) {
+            idxWL = headers.findIndex(h => h === 'Wavelength_Interp(nm)');
+            idxEQE = headers.findIndex(h => h === 'EQE_Interp(%)');
+            idxJsc = headers.findIndex(h => h === 'Int_Jsc_Interp(mA/cm2)');
+        } else {
+            idxWL = headers.findIndex(h => h === 'Wavelength(nm)');
+            idxEQE = headers.findIndex(h => h === 'EQE(%)');
+            idxJsc = headers.findIndex(h => h === 'Int_Jsc(mA/cm2)');
+        }
+        
+        if (idxWL === -1) idxWL = headers.findIndex(h => h.includes('Wavelength'));
+        if (idxEQE === -1) idxEQE = headers.findIndex(h => h.includes('EQE') && (isInterp ? h.includes('Interp') : !h.includes('Raw')));
+        if (idxJsc === -1) idxJsc = headers.findIndex(h => h.includes('Int_Jsc'));
+
+        let data = { x: [], eqe: [], jsc: [] };
+        
+        for (let i = 1; i < lines.length; i++) {
+            let cols = lines[i].split('\t');
+            if(!cols[idxWL]) continue;
+            
+            let x = parseFloat(cols[idxWL].replace(',', '.'));
+            let e = parseFloat(cols[idxEQE] !== undefined && cols[idxEQE] !== '' ? cols[idxEQE].replace(',', '.') : 'NaN');
+            
+            if(!isNaN(x) && !isNaN(e)) {
+                data.x.push(x);
+                data.eqe.push(e);
+            }
+            
+            if(idxJsc !== -1 && cols[idxJsc] !== undefined && cols[idxJsc].trim() !== '') {
+                let j = parseFloat(cols[idxJsc].replace(',', '.'));
+                if(!isNaN(x) && !isNaN(j)) {
+                    data.jsc.push(j);
+                }
+            }
+        }
+        return data.x.length > 0 ? data : null;
+    }
+
     /* =========================================================
-       3. ORIGIN GRAPH FACTORY (Le Noyau de Génération)
+       5. MODALS, SETTINGS & EXCLUSION TOGGLE
+       ========================================================= */
+    let dragStartIndex = -1;
+
+    window.toggleCell = (key, condName, surfValue, motifName) => {
+        const cleanCond = condName.replace(/_/g, ' ');
+        if (excludedSet.has(key)) { 
+            excludedSet.delete(key); 
+            log(`[Re-Included] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#3498db'); 
+        } else { 
+            excludedSet.add(key); 
+            log(`[Excluded] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#e74c3c'); 
+        }
+        renderUI();
+    };
+
+    function openOrderModal() {
+        document.getElementById('conditionHeaderInput').value = conditionColumnName;
+
+        const list = document.getElementById('orderList');
+        list.innerHTML = "";
+
+        // Helper pour échapper les valeurs HTML (Fix XSS sur les noms de conditions)
+        const escapeAttr = (str) => String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // Helper qui crée un order-item drag-and-droppable.
+        // Centralise toute la logique pour éviter la duplication massive et l'utilisation
+        // de arguments.callee (interdit en strict mode).
+        const buildOrderItem = (oldName, currentValue, index) => {
+            const div = document.createElement('div');
+            div.className = 'order-item draggable';
+            div.draggable = true;
+            div.dataset.index = index;
+
+            div.innerHTML = `
+                <span class="drag-handle">≡</span>
+                <input type="text" class="cond-name-input" data-oldname="${escapeAttr(oldName)}" value="${escapeAttr(currentValue)}"
+                       style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; font-family:inherit; font-weight:600; box-sizing:border-box;">
+            `;
+
+            const input = div.querySelector('.cond-name-input');
+            input.addEventListener('mousedown', () => { div.draggable = false; });
+            input.addEventListener('blur', () => { div.draggable = true; });
+            input.addEventListener('mouseout', () => { div.draggable = true; });
+
+            div.addEventListener('dragstart', function(e) {
+                dragStartIndex = +this.dataset.index;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            div.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            });
+            div.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            });
+            div.addEventListener('dragleave', function(e) {
+                this.classList.remove('drag-over');
+            });
+            div.addEventListener('drop', function(e) {
+                e.stopPropagation();
+                this.classList.remove('drag-over');
+                const dragEndIndex = +this.dataset.index;
+                if (dragStartIndex !== dragEndIndex && dragStartIndex !== -1) {
+                    // Capturer l'ordre actuel des inputs (avec valeurs éditées éventuellement)
+                    const currentInputs = Array.from(document.querySelectorAll('.cond-name-input')).map(inp => ({
+                        old: inp.dataset.oldname,
+                        newVal: inp.value
+                    }));
+                    const item = currentInputs.splice(dragStartIndex, 1)[0];
+                    currentInputs.splice(dragEndIndex, 0, item);
+
+                    // Reconstruire la liste en réutilisant le même helper (plus de duplication)
+                    list.innerHTML = "";
+                    currentInputs.forEach((obj, idx) => {
+                        list.appendChild(buildOrderItem(obj.old, obj.newVal, idx));
+                    });
+                }
+                return false;
+            });
+            div.addEventListener('dragend', function(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.order-item').forEach(i => i.classList.remove('drag-over'));
+            });
+
+            return div;
+        };
+
+        customOrder.forEach((cond, index) => {
+            list.appendChild(buildOrderItem(cond, cond, index));
+        });
+        document.getElementById('orderModal').style.display = 'block';
+    }
+
+    function applyOrder() {
+        conditionColumnName = document.getElementById('conditionHeaderInput').value.trim() || "Condition";
+        condSelectorTitle.innerText = conditionColumnName + ":";
+
+        const newGlobalData = {};
+        const newGlobalCurves = {};
+        const newGlobalEQE = {};
+        const newCustomOrder = [];
+        const newExcludedSet = new Set();
+        
+        const inputs = document.querySelectorAll('.cond-name-input');
+        const usedNames = new Set();
+        const newVisibleConditionsPub = new Set();
+
+        inputs.forEach(input => {
+            const oldName = input.dataset.oldname;
+            let newName = input.value.trim() || oldName;
+            
+            while(usedNames.has(newName)) { newName += " *"; }
+            usedNames.add(newName);
+            
+            newGlobalData[newName] = globalData[oldName];
+            if(globalCurves[oldName]) newGlobalCurves[newName] = globalCurves[oldName];
+            if(globalEQE[oldName]) newGlobalEQE[newName] = globalEQE[oldName];
+            
+            newCustomOrder.push(newName);
+            
+            excludedSet.forEach(key => {
+                const parts = key.split('|');
+                if (parts[0] === oldName) {
+                    newExcludedSet.add(`${newName}|${parts[1]}|${parts[2]}`);
+                }
+            });
+
+            // Migrer la visibilité Pub : si l'ancienne condition était visible (ou toutes visibles), conserver
+            if (visibleConditionsPub === null || visibleConditionsPub.has(oldName)) {
+                newVisibleConditionsPub.add(newName);
+            }
+        });
+        
+        globalData = newGlobalData;
+        globalCurves = newGlobalCurves;
+        globalEQE = newGlobalEQE;
+        customOrder = newCustomOrder;
+        excludedSet = newExcludedSet;
+        visibleConditionsPub = newVisibleConditionsPub;
+
+        if (!customOrder.includes(currentCondition)) {
+            currentCondition = customOrder[0];
+        }
+
+        document.getElementById('orderModal').style.display = 'none';
+        log("Settings applied (Order and Names updated).", "#f1c40f");
+        renderUI();
+    }
+
+    function openEqeModal() {
+        const list = document.getElementById('eqeList');
+        list.innerHTML = "";
+        customOrder.forEach((cond) => {
+            const div = document.createElement('div');
+            div.className = 'order-item';
+            div.style.cursor = 'default';
+            
+            const isLoaded = globalEQE[cond] !== undefined;
+            
+            div.innerHTML = `
+                <span style="font-weight:600; width: 60%;">${cond.replace(/_/g, ' ')}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 12px; color: ${isLoaded ? '#228b22' : '#7f8c8d'};">${isLoaded ? '✅ Loaded' : 'No file'}</span>
+                    <label class="btn btn-outline" style="padding: 5px 10px; font-size: 11px;">
+                        ${isLoaded ? 'Replace' : 'Upload'}
+                        <input type="file" accept=".csv,.txt" onchange="handleEqeUpload(event, '${cond}')">
+                    </label>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+        document.getElementById('eqeModal').style.display = 'block';
+    }
+
+    async function handleEqeUpload(event, cond) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const data = parseEQE(text);
+        if (data) {
+            globalEQE[cond] = data;
+            log(`EQE loaded for: ${cond.replace(/_/g, ' ')}`, '#3498db');
+        } else {
+            log(`Failed to parse EQE for: ${cond.replace(/_/g, ' ')}`, '#e74c3c');
+        }
+        openEqeModal(); 
+    }
+
+    function closeEqeModal() {
+        document.getElementById('eqeModal').style.display = 'none';
+        renderPubTab(); 
+    }
+
+    /* =========================================================
+       6. ORIGIN GRAPH FACTORY
        ========================================================= */
     function createOriginLayout(opt) {
         const fontConfig = { family: 'Arial', color: '#000000' };
+        
+        // Calculer PX/PY avec compensation paramétrique aux coins
+        const plotWidth = opt.width - opt.margin.l - opt.margin.r;
+        const plotHeight = opt.height - opt.margin.t - opt.margin.b;
+        const cornerComp = opt.cornerCompensation || 1;  // Par défaut 1px, Statistics peut utiliser 0.5
+        const PX = (cornerComp / 2) / plotWidth;
+        const PY = (cornerComp / 2) / plotHeight;
         
         let layout = {
             width: opt.width,
@@ -358,100 +858,204 @@
                 title: opt.xTitle ? `<b>${opt.xTitle}</b>` : '',
                 titlefont: { size: opt.titleFontSize || 18, family: 'Arial', color: '#000000' },
                 tickfont: { size: opt.tickFontSize || 14, family: 'Arial', color: '#000000' },
-                showline: true, linewidth: 2, linecolor: 'black', mirror: true,
-                ticks: 'inside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black',
+                showline: false, mirror: false, side: 'bottom',
+                ticks: 'outside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black', minor: { ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' },
                 showgrid: false, zeroline: false, color: '#000000'
             },
             yaxis: {
                 title: opt.yTitle ? `<b>${opt.yTitle}</b>` : '',
                 titlefont: { size: opt.titleFontSize || 18, family: 'Arial', color: '#000000' },
                 tickfont: { size: opt.tickFontSize || 14, family: 'Arial', color: '#000000' },
-                showline: true, linewidth: 2, linecolor: 'black', mirror: true,
-                ticks: 'inside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black',
+                showline: false, mirror: false, side: 'left',
+                ticks: 'outside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black', minor: { ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' },
                 showgrid: false, zeroline: false, color: '#000000'
             }
         };
 
-        if (opt.showlegend) {
-            layout.legend = { x: 0.05, y: 0.95, font: { family: 'Arial', size: 14, color: '#000000' }, bgcolor: 'transparent' };
+        if (opt.y2Title) {
+            layout.yaxis2 = {
+                title: `<b>${opt.y2Title}</b>`,
+                titlefont: { size: opt.titleFontSize || 18, family: 'Arial', color: '#000000' },
+                tickfont: { size: opt.tickFontSize || 14, family: 'Arial', color: '#000000' },
+                showline: false,
+                ticks: 'outside', ticklen: opt.tickLen || 6, tickwidth: opt.tickWidth || 2, tickcolor: 'black', minor: { ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' },
+                showgrid: false, zeroline: false, color: '#000000',
+                overlaying: 'y', side: 'right'
+            };
         }
 
-        // Ranges stricts
+        if (opt.showlegend) layout.legend = { x: 0.05, y: 0.95, font: { family: 'Arial', size: 14, color: '#000000' }, bgcolor: 'transparent', itemwidth: 30 };
+
         if (opt.xRange) { layout.xaxis.range = opt.xRange; layout.xaxis.autorange = false; }
         if (opt.yRange) { layout.yaxis.range = opt.yRange; layout.yaxis.autorange = false; }
+        if (opt.y2Range && opt.y2Title) { layout.yaxis2.range = opt.y2Range; layout.yaxis2.autorange = false; }
 
-        // Ticks (Conditionally applied ONLY if data/yRange exists to prevent black bar bug)
         if (opt.xTick && opt.xRange) layout.xaxis.dtick = opt.xTick;
-        if (opt.xMinorTick && opt.xRange) layout.xaxis.minor = { dtick: opt.xMinorTick, ticks: 'inside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 1.5, tickcolor: 'black' };
+        if (opt.xMinorTick && opt.xRange) layout.xaxis.minor = { dtick: opt.xMinorTick, ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' };
         
         if (opt.yTick && opt.yRange) layout.yaxis.dtick = opt.yTick;
-        if (opt.yMinorTick && opt.yRange) layout.yaxis.minor = { dtick: opt.yMinorTick, ticks: 'inside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 1.5, tickcolor: 'black' };
+        if (opt.yMinorTick && opt.yRange) layout.yaxis.minor = { dtick: opt.yMinorTick, ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' };
 
-        // Format Décimales
+        if (opt.y2Tick && opt.y2Range) layout.yaxis2.dtick = opt.y2Tick;
+        if (opt.y2MinorTick && opt.y2Range) layout.yaxis2.minor = { dtick: opt.y2MinorTick, ticks: 'outside', ticklen: (opt.tickLen || 6) * 0.5, tickwidth: 2, tickcolor: 'black' };
+
         if (opt.xFormat) layout.xaxis.tickformat = opt.xFormat;
         if (opt.yFormat) layout.yaxis.tickformat = opt.yFormat;
+        if (opt.y2Format && opt.y2Title) layout.yaxis2.tickformat = opt.y2Format;
 
-        // Croix de zéro (pour le JV)
-        if (opt.zeroLines && opt.xRange && opt.yRange) {
-            layout.shapes = [
-                { type: 'line', x0: opt.xRange[0], x1: opt.xRange[1], y0: 0, y1: 0, line: { color: 'black', width: 2 } },
-                { type: 'line', x0: 0, x1: 0, y0: opt.yRange[0], y1: opt.yRange[1], line: { color: 'black', width: 2 } }
-            ];
+        // Créer le cadre avec 4 shapes en coordonnées paper + axes intérieurs en coordonnées données
+        layout.shapes = [];
+        
+        // Cadre externe en coordonnées paper
+        layout.shapes.push(
+            // Bas (étendu horizontalement pour fermer les coins)
+            { type: 'line', xref: 'paper', yref: 'paper',
+              x0: -PX, x1: 1 + PX, y0: 0, y1: 0,
+              line: { color: 'black', width: opt.tickWidth || 2 } },
+            // Haut (étendu horizontalement)
+            { type: 'line', xref: 'paper', yref: 'paper',
+              x0: -PX, x1: 1 + PX, y0: 1, y1: 1,
+              line: { color: 'black', width: opt.tickWidth || 2 } },
+            // Gauche
+            { type: 'line', xref: 'paper', yref: 'paper',
+              x0: 0, x1: 0, y0: -PY, y1: 1 + PY,
+              line: { color: 'black', width: opt.tickWidth || 2 } },
+            // Droite
+            { type: 'line', xref: 'paper', yref: 'paper',
+              x0: 1, x1: 1, y0: -PY, y1: 1 + PY,
+              line: { color: 'black', width: opt.tickWidth || 2 } }
+        );
+        
+        // Axes intérieurs (X=0 et Y=0) en coordonnées données
+        if (opt.xRange && opt.yRange) {
+            layout.shapes.push(
+                { type: 'line', xref: 'x', yref: 'y',
+                  x0: opt.xRange[0], x1: opt.xRange[1], y0: 0, y1: 0,
+                  line: { color: 'black', width: 2 } },
+                { type: 'line', xref: 'x', yref: 'y',
+                  x0: 0, x1: 0, y0: opt.yRange[0], y1: opt.yRange[1],
+                  line: { color: 'black', width: 2 } }
+            );
         }
 
         return layout;
     }
 
     function getJVLayout() {
-        return createOriginLayout({
-            width: 660, height: 500, margin: { l: 70, r: 30, t: 30, b: 70 },
+        const layout = createOriginLayout({
+            width: 660, height: 500, margin: { l: 60, r: 20, t: 20, b: 60 },
             showlegend: true, xTitle: 'Voltage (V)', yTitle: 'J (mA/cm²)',
             xRange: [-0.5, 1.0], yRange: [-30, 30],
             xTick: 0.2, xMinorTick: 0.1, yTick: 5, yMinorTick: 1,
-            yFormat: '.0f', // Fix: 0 décimales pour le J-V (ex: 25 au lieu de 25.00)
-            zeroLines: true
+            xFormat: '.1f', yFormat: '.0f', tickWidth: 2, tickLen: 6
         });
+        
+        // Ajuster tick0 pour bien aligner les ticks
+        layout.xaxis.tick0 = 0;
+        layout.yaxis.tick0 = -30;
+        
+        return layout;
+    }
+
+    function getEQELayout() {
+        const layout = createOriginLayout({
+            width: 660, height: 500, margin: { l: 60, r: 60, t: 20, b: 60 }, 
+            showlegend: false, xTitle: 'Wavelength (nm)', yTitle: 'EQE (%)', y2Title: 'Integrated Jsc (mA/cm²)',
+            xRange: [300, 1000], yRange: [0, 100], y2Range: [0, 30],
+            xTick: 100, xMinorTick: 50, yTick: 10, yMinorTick: 5, y2Tick: 2, y2MinorTick: 1,
+            xFormat: '.0f', yFormat: '.0f', y2Format: '.0f', tickWidth: 2, tickLen: 6
+        });
+        
+        layout.xaxis.tick0 = 300;
+        layout.yaxis.tick0 = 0;
+        
+        return layout;
     }
 
     function getStatLayout(yTitle, tickFormat, dtickMaj, dtickMin, yRange = null) {
-        return createOriginLayout({
+        const layout = createOriginLayout({
             width: 460, height: 350, margin: { l: 60, r: 20, t: 30, b: 49 },
-            showlegend: false, yTitle: yTitle,
-            yRange: yRange, // Indique si on a des datas ou un graphe vide
+            showlegend: false, yTitle: yTitle, yRange: yRange, 
             yTick: dtickMaj, yMinorTick: dtickMin, yFormat: tickFormat,
-            titleFontSize: 16, tickFontSize: 12, tickLen: 5, tickWidth: 1.5
+            titleFontSize: 16, tickFontSize: 12, tickLen: 5, tickWidth: 1.5,
+            cornerCompensation: 0.5  // 0.5px pour Statistics (plus propre aux coins)
         });
+        
+        // Configurer l'axe X pour Statistics : ticks "in", pas de minor
+        layout.xaxis.ticks = 'inside';  // Forcer 'inside' au lieu de 'outside'
+        delete layout.xaxis.minor;  // Supprimer complètement les minor ticks
+        
+        return layout;
     }
 
     function buildJVPlotConfig(surf) {
         let traces = []; let colorIdx = 0;
-        Object.keys(globalData).sort().forEach(cond => {
-            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
-            if (validCells.length === 0) return;
-            const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
+        customOrder.forEach(cond => {
+            const validCells = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`)) : [];
+            // colorIdx incrémenté AVANT le test de visibilité pour préserver le mapping couleur
             const color = customPalette[colorIdx % customPalette.length];
+            colorIdx++;
+            // Condition absente de données ou masquée par l'utilisateur dans Pub : on saute la trace
+            if (validCells.length === 0) return;
+            if (visibleConditionsPub !== null && !visibleConditionsPub.has(cond)) return;
+            const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
             if (globalCurves[cond]) {
                 const x = [], y = [];
                 globalCurves[cond].forEach(pt => { 
                     const keys = Object.keys(pt);
                     if(pt[keys[0]] !== undefined && pt[champ['Motif']] !== undefined) { x.push(pt[keys[0]]); y.push(pt[champ['Motif']]); }
                 });
-                if(x.length > 0) traces.push({ x, y, name: cond.replace(/_/g, ' '), mode: 'lines', line: { color, width: 2 } });
+                if(x.length > 0) traces.push({ x, y, name: cond.replace(/_/g, ' '), mode: 'lines', line: { color, width: 3 } });
             }
-            colorIdx++;
         });
         return { data: traces, layout: getJVLayout() };
     }
 
+    function buildEQEPlotConfig(surf) {
+        let traces = []; let colorIdx = 0;
+        customOrder.forEach(cond => {
+            const validCells = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`)) : [];
+            // colorIdx incrémenté AVANT le test de visibilité pour préserver le mapping couleur
+            const color = customPalette[colorIdx % customPalette.length];
+            colorIdx++;
+            // Condition absente de données ou masquée par l'utilisateur dans Pub : on saute
+            if (validCells.length === 0) return;
+            if (visibleConditionsPub !== null && !visibleConditionsPub.has(cond)) return;
+            
+            if (globalEQE[cond]) {
+                traces.push({ x: globalEQE[cond].x, y: globalEQE[cond].eqe, name: cond, mode: 'lines', line: { color, width: 3, dash: 'solid' }, yaxis: 'y', showlegend: false });
+                if (globalEQE[cond].jsc.length > 0) {
+                    traces.push({ x: globalEQE[cond].x, y: globalEQE[cond].jsc, name: cond + ' Jsc', mode: 'lines', line: { color, width: 3, dash: 'dash' }, yaxis: 'y2', showlegend: false });
+                }
+            }
+        });
+        return { data: traces, layout: getEQELayout() };
+    }
+
     function buildStatPlotConfig(surf, pName, dtickMaj, dtickMin, tickFmt) {
-        let traces = []; let allVals = []; let colorIdx = 0;
-        Object.keys(globalData).sort().forEach(cond => {
-            const valid = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
-            if (valid.length === 0) return;
+        let traces = []; let allVals = []; let colorIdx = 0; let xPos = 1; let conditionLabels = [];
+        customOrder.forEach((cond, idx) => {
+            const valid = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`)) : [];
+            if (valid.length === 0) { colorIdx++; return; }
             const color = customPalette[colorIdx % customPalette.length];
             let vals = valid.map(c => c[pName]).filter(v => v !== null && !isNaN(v));
             allVals.push(...vals);
-            traces.push({ y: vals, name: cond.replace(/_/g, ' '), type: 'box', boxpoints: 'all', jitter: 0.3, pointpos: 0, marker: { color: '#000000', size: 4 }, fillcolor: color, line: { color: '#000000', width: 1.5 }, width: 0.3 });
+            // Créer des traces avec x explicite basé sur l'index
+            traces.push({ 
+                x: Array(vals.length).fill(xPos), 
+                y: vals, 
+                name: cond.replace(/_/g, ' '), 
+                type: 'box', 
+                boxpoints: 'all', 
+                jitter: 0.3, 
+                pointpos: 0, 
+                marker: { color: '#000000', size: 3 }, 
+                fillcolor: color, 
+                line: { color: '#000000', width: 2 }, 
+                width: 0.3 
+            });
+            conditionLabels.push(cond.replace(/_/g, ' '));
+            xPos++;
             colorIdx++;
         });
 
@@ -463,14 +1067,45 @@
         }
         
         let layout = getStatLayout(pName, tickFmt, dtickMaj, dtickMin, layoutRange);
+        
+        // Ajuster xRange et ajouter des ticktext personnalisés
+        if (traces.length > 0) {
+            layout.xaxis.range = [0.5, traces.length + 0.5];
+            layout.xaxis.tick0 = 1;
+            layout.xaxis.dtick = 1;
+            layout.xaxis.tickmode = 'array';
+            layout.xaxis.tickvals = Array.from({length: traces.length}, (_, i) => i + 1);
+            layout.xaxis.ticktext = conditionLabels;
+        }
+        
+        // Pour Statistics, les shapes intérieures (X=0, Y=0) doivent être adaptées au yRange dynamique
+        // Le cadre externe est déjà créé par createOriginLayout
+        // On ne remplace que les axes intérieurs
+        if (layoutRange && layout.shapes) {
+            // Garder le cadre externe (4 premières shapes), remplacer les axes intérieurs
+            const frameShapes = layout.shapes.slice(0, 4);
+            const interiorShapes = [];
+            // Axe Y=0 seulement s'il est dans le range
+            if (layoutRange[0] <= 0 && 0 <= layoutRange[1]) {
+                interiorShapes.push({
+                    type: 'line', xref: 'x', yref: 'y',
+                    x0: 0.5, x1: traces.length + 0.5, y0: 0, y1: 0,
+                    line: { color: 'black', width: 2 }
+                });
+            }
+            layout.shapes = frameShapes.concat(interiorShapes);
+        }
+        
         return { data: traces, layout };
     }
 
     /* =========================================================
-       4. FONCTIONS DE RENDU DANS L'INTERFACE (Render)
+       7. FONCTIONS DE RENDU DANS L'INTERFACE (Render)
        ========================================================= */
     function renderEmptyPlots() {
         Plotly.react('jvPlot', [], getJVLayout(), { staticPlot: true, responsive: false });
+        const eqeWrapper = document.getElementById('eqePlotWrapper');
+        if (eqeWrapper) eqeWrapper.style.display = 'none';
         Plotly.react('statPlotVoc', [], getStatLayout('Voc (V)', '.2f', 0.01, 0.005), { staticPlot: true, responsive: false });
         Plotly.react('statPlotJsc', [], getStatLayout('Jsc (mA/cm²)', '.1f', 0.5, 0.1), { staticPlot: true, responsive: false });
         Plotly.react('statPlotFF', [], getStatLayout('FF (%)', '.1f', 1, 0.5), { staticPlot: true, responsive: false });
@@ -478,7 +1113,6 @@
     }
 
     function renderUI() {
-        const sortedConds = Object.keys(globalData).sort();
         surfaceBtnsDiv.innerHTML = "";
         uniqueSurfaces.forEach(s => {
             const b = document.createElement('button');
@@ -488,13 +1122,39 @@
             surfaceBtnsDiv.appendChild(b);
         });
 
+        // Boutons Condition (single-select) — onglet Data Filtering
         condBtnsDiv.innerHTML = "";
-        sortedConds.forEach(c => {
+        customOrder.forEach(c => {
             const b = document.createElement('button');
             b.className = `cond-btn ${c === currentCondition ? 'active' : ''}`;
             b.innerText = c.replace(/_/g, ' ');
             b.onclick = () => { currentCondition = c; renderUI(); };
             condBtnsDiv.appendChild(b);
+        });
+
+        // Boutons Graphs (multi-select) — onglet Publications
+        // Initialiser visibleConditionsPub si null (premier render)
+        if (visibleConditionsPub === null) {
+            visibleConditionsPub = new Set(customOrder);
+        }
+        condPubBtnsDiv.innerHTML = "";
+        customOrder.forEach(c => {
+            const isVisible = visibleConditionsPub.has(c);
+            const b = document.createElement('button');
+            b.className = `cond-btn ${isVisible ? 'active' : ''}`;
+            b.innerText = c.replace(/_/g, ' ');
+            b.onclick = () => {
+                if (visibleConditionsPub.has(c)) {
+                    // Ne pas permettre de tout décocher
+                    if (visibleConditionsPub.size > 1) {
+                        visibleConditionsPub.delete(c);
+                    }
+                } else {
+                    visibleConditionsPub.add(c);
+                }
+                renderUI();
+            };
+            condPubBtnsDiv.appendChild(b);
         });
 
         const activeTab = document.querySelector('.tab-btn.active').id;
@@ -506,7 +1166,7 @@
     function renderFilterTab() {
         filterBody.innerHTML = "";
         document.getElementById('footnoteFilter').innerText = `Showing all cells for: ${currentCondition.replace(/_/g, ' ')} | Area: ${currentSurface.toFixed(2)} cm²`;
-        const rows = globalData[currentCondition].filter(r => r['Surface (cm²)'] === currentSurface);
+        const rows = globalData[currentCondition] ? globalData[currentCondition].filter(r => r['Surface (cm²)'] === currentSurface) : [];
         
         const getRange = (p) => {
             const validRows = rows.filter(r => !excludedSet.has(`${currentCondition}|${currentSurface}|${r['Motif']}`));
@@ -535,9 +1195,18 @@
     }
 
     function renderPubTab() {
-        pubBody.innerHTML = ""; document.getElementById('footnotePub').innerText = `Active Area: ${currentSurface.toFixed(2)} cm²`;
-        Object.keys(globalData).sort().forEach(cond => {
-            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === currentSurface && !excludedSet.has(`${cond}|${currentSurface}|${c['Motif']}`));
+        const hasAnyEQE = Object.keys(globalEQE).length > 0;
+        
+        if (hasAnyEQE) {
+            pubHead.innerHTML = `<tr><th>${conditionColumnName}</th><th>Voc (V)</th><th>Jsc (mA/cm²)<sup>a</sup></th><th>Jsc (mA/cm²)<sup>b</sup></th><th>FF (%)</th><th>PCE (%)</th><th>Best PCE (%)</th><th>Number of cells</th></tr>`;
+        } else {
+            pubHead.innerHTML = `<tr><th>${conditionColumnName}</th><th>Voc (V)</th><th>Jsc (mA/cm²)</th><th>FF (%)</th><th>PCE (%)</th><th>Best PCE (%)</th><th>Number of cells</th></tr>`;
+        }
+
+        pubBody.innerHTML = ""; 
+        
+        customOrder.forEach(cond => {
+            const validCells = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === currentSurface && !excludedSet.has(`${cond}|${currentSurface}|${c['Motif']}`)) : [];
             if (validCells.length === 0) return;
             
             const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
@@ -546,12 +1215,51 @@
             const sF = calcStats(validCells.map(c => c['FF (%)']));
             const sP = calcStats(validCells.map(c => c['PCE (%)']));
 
+            let eqeJscText = '--';
+            if (hasAnyEQE) {
+                if (globalEQE[cond] && globalEQE[cond].jsc.length > 0) {
+                    const jscArr = globalEQE[cond].jsc;
+                    let lastVal = null;
+                    for (let i = jscArr.length - 1; i >= 0; i--) {
+                        if (jscArr[i] !== null && !isNaN(jscArr[i]) && jscArr[i] !== 0) {
+                            lastVal = jscArr[i];
+                            break;
+                        }
+                    }
+                    if (lastVal !== null) eqeJscText = lastVal.toFixed(1);
+                }
+            }
+
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${cond.replace(/_/g, ' ')}</td><td>${sV.m.toFixed(3)} ± ${sV.sd.toFixed(3)}</td><td>${sJ.m.toFixed(1)} ± ${sJ.sd.toFixed(1)}</td><td>${sF.m.toFixed(1)} ± ${sF.sd.toFixed(1)}</td><td>${sP.m.toFixed(1)} ± ${sP.sd.toFixed(1)}</td><td><b>${champ['PCE (%)'] ? champ['PCE (%)'].toFixed(1) : '--'}</b></td><td>${validCells.length}</td>`;
+            let rowHTML = `<td>${cond.replace(/_/g, ' ')}</td>
+                           <td>${sV.m.toFixed(3)} ± ${sV.sd.toFixed(3)}</td>
+                           <td>${sJ.m.toFixed(1)} ± ${sJ.sd.toFixed(1)}</td>`;
+            if (hasAnyEQE) rowHTML += `<td>${eqeJscText}</td>`;
+            
+            rowHTML += `<td>${sF.m.toFixed(1)} ± ${sF.sd.toFixed(1)}</td>
+                        <td>${sP.m.toFixed(1)} ± ${sP.sd.toFixed(1)}</td>
+                        <td><b>${champ['PCE (%)'] ? champ['PCE (%)'].toFixed(1) : '--'}</b></td>
+                        <td>${validCells.length}</td>`;
+            tr.innerHTML = rowHTML;
             pubBody.appendChild(tr);
         });
+
+        let footnoteHtml = `<i>Active Area: ${currentSurface.toFixed(2)} cm²</i>`;
+        if (hasAnyEQE) {
+            footnoteHtml += `<br><i style="font-size: 13px;"><sup>a</sup>From J-V curve<br><sup>b</sup>From External Quantum Efficiency (EQE)</i>`;
+        }
+        document.getElementById('footnotePub').innerHTML = footnoteHtml;
+        
         const jvConfig = buildJVPlotConfig(currentSurface);
         Plotly.react('jvPlot', jvConfig.data, jvConfig.layout, { staticPlot: true });
+
+        const eqeConfig = buildEQEPlotConfig(currentSurface);
+        if (eqeConfig.data.length > 0) {
+            document.getElementById('eqePlotWrapper').style.display = 'block';
+            Plotly.react('eqePlot', eqeConfig.data, eqeConfig.layout, { staticPlot: true });
+        } else {
+            document.getElementById('eqePlotWrapper').style.display = 'none';
+        }
     }
 
     function renderStatTab() {
@@ -569,10 +1277,8 @@
     }
 
     /* =========================================================
-       5. GESTION DES EVENEMENTS (Load, Fichiers, Boutons)
+       8. GESTION DES DOSSIERS (IMPORT NOUS SESSIONS)
        ========================================================= */
-    window.onload = renderEmptyPlots;
-
     folderInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -582,7 +1288,7 @@
         seriesTitle.value = parentName.replace(/_/g, ' '); 
         
         log(`Analyzing folder...`, '#3498db');
-        globalData = {}; globalCurves = {}; excludedSet.clear();
+        globalData = {}; globalCurves = {}; globalEQE = {}; excludedSet.clear();
         let sSet = new Set();
 
         const recapFiles = files.filter(f => f.name.endsWith('_Recap.csv') && !f.name.includes('Raw'));
@@ -616,52 +1322,47 @@
             globalCurves[cond] = lines.slice(1).map(l => {
                 const v = l.split('\t');
                 let o = {};
-                headers.forEach((h, i) => o[h] = parseFloat(v[i].replace(',','.')));
+                headers.forEach((h, i) => {
+                    // Fix: protéger contre les colonnes manquantes (lignes incomplètes)
+                    const raw = v[i];
+                    o[h] = (raw === undefined || raw === '') ? NaN : parseFloat(raw.replace(',', '.'));
+                });
                 return o;
             });
         }
 
         uniqueSurfaces = Array.from(sSet).sort((a,b) => a-b);
         if (uniqueSurfaces.length > 0) {
+            customOrder = Object.keys(globalData).sort(); 
             currentSurface = uniqueSurfaces[0];
-            currentCondition = Object.keys(globalData).sort()[0];
+            currentCondition = customOrder[0];
+            // Toutes les conditions visibles par défaut dans les graphes Pub
+            visibleConditionsPub = new Set(customOrder);
             document.getElementById('globalSelectors').style.display = 'flex';
             
             const activeTab = document.querySelector('.tab-btn.active').id;
             document.getElementById('condSelectorRow').style.display = (activeTab === 'btn-filter') ? 'flex' : 'none';
+            document.getElementById('condSelectorPubRow').style.display = (activeTab === 'btn-pub') ? 'flex' : 'none';
 
             renderUI();
-            exportBtn.disabled = false; exportStatBtn.disabled = false; exportPdfBtn.disabled = false;
-            log("Import complete.", "#2ecc71");
+            exportBtn.disabled = false;
+            exportStatBtn.disabled = false;
+            exportPdfBtn.disabled = false;
+            orderBtn.disabled = false;
+            openEqeModalBtn.disabled = false;
+            saveBtn.disabled = false;
+            log("Import complete.", "success");
         }
     });
 
-    toggleHeatmap.onclick = () => {
-        heatmapActive = !heatmapActive;
-        toggleHeatmap.innerText = heatmapActive ? "Heatmap: ON" : "Heatmap: OFF";
-        toggleHeatmap.classList.toggle('active');
-        renderUI();
-    };
-
-    window.toggleCell = (key, condName, surfValue, motifName) => {
-        const cleanCond = condName.replace(/_/g, ' ');
-        if (excludedSet.has(key)) { 
-            excludedSet.delete(key); 
-            log(`[Re-Included] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#3498db'); 
-        } else { 
-            excludedSet.add(key); 
-            log(`[Excluded] ${cleanCond} | ${surfValue}cm² | Motif ${motifName}`, '#e74c3c'); 
-        }
-        renderUI();
-    };
-
     /* =========================================================
-       6. EXPORTATIONS (CSV & PDF)
+       9. EXPORTATIONS (CSV & PDF)
        ========================================================= */
     function buildTableDataForSurface(surf) {
+        const hasAnyEQE = Object.keys(globalEQE).length > 0;
         let tableData = [];
-        Object.keys(globalData).sort().forEach(cond => {
-            const validCells = globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`));
+        customOrder.forEach(cond => {
+            const validCells = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`)) : [];
             if (validCells.length === 0) return;
             const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
             
@@ -670,12 +1371,31 @@
             const fS = calcStats(validCells.map(c => c['FF (%)']));
             const pS = calcStats(validCells.map(c => c['PCE (%)']));
 
-            tableData.push([
+            let eqeJscText = '--';
+            if (hasAnyEQE && globalEQE[cond] && globalEQE[cond].jsc.length > 0) {
+                const jscArr = globalEQE[cond].jsc;
+                let lastVal = null;
+                for (let i = jscArr.length - 1; i >= 0; i--) {
+                    if (jscArr[i] !== null && !isNaN(jscArr[i]) && jscArr[i] !== 0) { lastVal = jscArr[i]; break; }
+                }
+                if (lastVal !== null) eqeJscText = lastVal.toFixed(1);
+            }
+
+            let row = [
                 cond.replace(/_/g, ' '),
-                `${vS.m.toFixed(3)} ± ${vS.sd.toFixed(3)}`, `${jS.m.toFixed(1)} ± ${jS.sd.toFixed(1)}`,
+                `${vS.m.toFixed(3)} ± ${vS.sd.toFixed(3)}`, 
+                `${jS.m.toFixed(1)} ± ${jS.sd.toFixed(1)}`
+            ];
+            
+            if (hasAnyEQE) row.push(eqeJscText);
+            
+            row.push(
                 `${fS.m.toFixed(1)} ± ${fS.sd.toFixed(1)}`, `${pS.m.toFixed(1)} ± ${pS.sd.toFixed(1)}`,
-                champ['PCE (%)'].toFixed(1), validCells.length.toString()
-            ]);
+                (champ['PCE (%)'] !== null && !isNaN(champ['PCE (%)'])) ? champ['PCE (%)'].toFixed(1) : '--',
+                validCells.length.toString()
+            );
+
+            tableData.push(row);
         });
         return tableData;
     }
@@ -689,6 +1409,11 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4'); 
             const title = seriesTitle.value || "Untitled Series";
+            const hasAnyEQE = Object.keys(globalEQE).length > 0;
+
+            const headerArr = hasAnyEQE ? 
+                [[conditionColumnName, 'Voc (V)', 'Jsc (mA/cm²) a', 'Jsc (mA/cm²) b', 'FF (%)', 'PCE (%)', 'Best PCE (%)', 'Cells']] :
+                [[conditionColumnName, 'Voc (V)', 'Jsc (mA/cm²)', 'FF (%)', 'PCE (%)', 'Best PCE (%)', 'Cells']];
 
             for (let i = 0; i < uniqueSurfaces.length; i++) {
                 let surf = uniqueSurfaces[i];
@@ -700,27 +1425,89 @@
                 doc.setFontSize(14); doc.setFont('times', 'italic');
                 doc.text(`Area: ${surf.toFixed(2)} cm² - Publication Recap`, 105, 28, { align: 'center' });
 
-                const tableData = buildTableDataForSurface(surf);
+                // Construct Table Data
+                let tableData = [];
+                customOrder.forEach(cond => {
+                    const validCells = globalData[cond] ? globalData[cond].filter(c => c['Surface (cm²)'] === surf && !excludedSet.has(`${cond}|${surf}|${c['Motif']}`)) : [];
+                    if (validCells.length === 0) return;
+                    const champ = validCells.reduce((prev, curr) => (prev['PCE (%)'] > curr['PCE (%)']) ? prev : curr);
+                    const vS = calcStats(validCells.map(c => c['Voc (V)']));
+                    const jS = calcStats(validCells.map(c => c['Jsc (mA/cm²)']));
+                    const fS = calcStats(validCells.map(c => c['FF (%)']));
+                    const pS = calcStats(validCells.map(c => c['PCE (%)']));
+
+                    let eqeJscText = '--';
+                    if (hasAnyEQE && globalEQE[cond] && globalEQE[cond].jsc.length > 0) {
+                        const jscArr = globalEQE[cond].jsc;
+                        let lastVal = null;
+                        for (let k = jscArr.length - 1; k >= 0; k--) {
+                            if (jscArr[k] !== null && !isNaN(jscArr[k]) && jscArr[k] !== 0) { lastVal = jscArr[k]; break; }
+                        }
+                        if (lastVal !== null) eqeJscText = lastVal.toFixed(1);
+                    }
+
+                    let row = [
+                        cond.replace(/_/g, ' '),
+                        `${vS.m.toFixed(3)} ± ${vS.sd.toFixed(3)}`, 
+                        `${jS.m.toFixed(1)} ± ${jS.sd.toFixed(1)}`
+                    ];
+                    if (hasAnyEQE) row.push(eqeJscText);
+                    row.push(
+                        `${fS.m.toFixed(1)} ± ${fS.sd.toFixed(1)}`,
+                        `${pS.m.toFixed(1)} ± ${pS.sd.toFixed(1)}`,
+                        (champ['PCE (%)'] !== null && !isNaN(champ['PCE (%)'])) ? champ['PCE (%)'].toFixed(1) : '--',
+                        validCells.length.toString()
+                    );
+                    tableData.push(row);
+                });
+
                 doc.autoTable({
                     startY: 38,
-                    head: [['Condition', 'Voc (V)', 'Jsc (mA/cm²)', 'FF (%)', 'PCE (%)', 'Best PCE (%)', 'Cells']],
+                    head: headerArr,
                     body: tableData,
                     theme: 'plain',
                     styles: { font: 'times', fontSize: 10, halign: 'center', textColor: 0, cellPadding: 2 },
                     headStyles: { fontStyle: 'bold' },
                     didDrawPage: function(data) { }
                 });
-                
-                const finalY = doc.lastAutoTable.finalY;
-                const headHeight = doc.lastAutoTable.head[0].height;
-                doc.setLineWidth(0.2); doc.line(14, 38, 196, 38); 
-                doc.setLineWidth(0.2); doc.line(14, 38 + headHeight, 196, 38 + headHeight); 
-                doc.setLineWidth(0.2); doc.line(14, finalY, 196, finalY); 
 
+                // Récupérer finalY depuis lastAutoTable. La startY du tableau est 38.
+                let finalY = doc.lastAutoTable.finalY;
+                // Lignes horizontales du style "publication" : haut, sous l'entête, bas
+                // On retrouve la position de la ligne sous l'entête en comptant à partir de la dernière ligne dessinée
+                // (autoTable ne fournit pas head[0].height — on déduit la hauteur d'entête depuis la table)
+                const tableTable = doc.lastAutoTable.table;
+                const headRow = tableTable && tableTable.head && tableTable.head[0];
+                const headHeight = headRow ? headRow.height : 8; // fallback raisonnable
+                doc.setLineWidth(0.2); doc.line(14, 38, 196, 38);
+                doc.setLineWidth(0.2); doc.line(14, 38 + headHeight, 196, 38 + headHeight);
+                doc.setLineWidth(0.2); doc.line(14, finalY, 196, finalY);
+
+                // Ajout des légendes en dessous du tableau pour le PDF
+                if (hasAnyEQE) {
+                    doc.setFontSize(10);
+                    doc.setFont('times', 'italic');
+                    doc.text("a From J-V curve", 14, finalY + 5);
+                    doc.text("b From External Quantum Efficiency (EQE)", 14, finalY + 10);
+                    finalY += 12;
+                }
+
+                // Graphiques
                 const jvConfig = buildJVPlotConfig(surf);
+                const eqeConfig = buildEQEPlotConfig(surf);
+                
                 if (jvConfig.data.length > 0) {
-                    const jvImg = await Plotly.toImage(jvConfig, {format: 'jpeg', width: 700, height: 500, scale: 3}); 
-                    doc.addImage(jvImg, 'JPEG', 35, finalY + 15, 140, 100); 
+                    if (eqeConfig.data.length > 0) {
+                        const [jvImg, eqeImg] = await Promise.all([
+                            Plotly.toImage(jvConfig, {format: 'jpeg', width: 700, height: 500, scale: 3}),
+                            Plotly.toImage(eqeConfig, {format: 'jpeg', width: 700, height: 500, scale: 3})
+                        ]);
+                        doc.addImage(jvImg, 'JPEG', 15, finalY + 10, 85, 60); 
+                        doc.addImage(eqeImg, 'JPEG', 110, finalY + 10, 85, 60);
+                    } else {
+                        const jvImg = await Plotly.toImage(jvConfig, {format: 'jpeg', width: 700, height: 500, scale: 3}); 
+                        doc.addImage(jvImg, 'JPEG', 35, finalY + 10, 140, 100); 
+                    }
                 }
 
                 // PAGE B
@@ -762,13 +1549,14 @@
 
     exportStatBtn.onclick = () => { 
         log("Generating filtered Stat.csv...", "#f1c40f");
-        const conditions = Object.keys(globalData).sort();
+        const conditions = customOrder;
         const params = ['Voc (V)', 'Jsc (mA/cm²)', 'FF (%)', 'PCE (%)'];
         let allCols = []; let maxR = 0;
 
         params.forEach((param, pIdx) => {
             conditions.forEach(cond => {
-                let surfs = new Set(); globalData[cond].forEach(c => surfs.add(c['Surface (cm²)']));
+                let surfs = new Set(); 
+                if(globalData[cond]) globalData[cond].forEach(c => surfs.add(c['Surface (cm²)']));
                 Array.from(surfs).sort((a,b)=>a-b).forEach(s => {
                     let col = [param, cond.replace(/_/g, ' '), s.toFixed(2) + 'cm2'];
                     globalData[cond].filter(c => c['Surface (cm²)'] === s && !excludedSet.has(`${cond}|${s}|${c['Motif']}`)).forEach(c => {
@@ -785,13 +1573,16 @@
 
         allCols.forEach(c => { while(c.length < maxR) c.push(''); });
         let rows = []; for(let i=0; i<maxR; i++) { let r = []; for(let j=0; j<allCols.length; j++) r.push(allCols[j][i]); rows.push(r.join('\t')); }
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(["\uFEFF" + rows.join('\n')], {type:'text/csv'})); a.download = "Stat.csv"; a.click();
+        const a = document.createElement('a');
+        const url = URL.createObjectURL(new Blob(["\uFEFF" + rows.join('\n')], {type:'text/csv'}));
+        a.href = url; a.download = "Stat.csv"; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         log("Filtered Stat.csv exported.", "success");
     };
 
     exportBtn.onclick = () => { 
         log("Generating filtered Complete Recap...", "#f1c40f");
-        const conditions = Object.keys(globalData).sort();
+        const conditions = customOrder;
         const COL_PER_COND = 11;
         let grid = [];
         const addRow = () => { let r = new Array(conditions.length * (COL_PER_COND + 1)).fill(''); grid.push(r); return grid.length - 1; };
@@ -800,7 +1591,7 @@
         let maxSurfs = 0, maxCells = 0;
         conditions.forEach(c => {
             let surfs = {};
-            const valid = globalData[c].filter(cell => !excludedSet.has(`${c}|${cell['Surface (cm²)']}|${cell['Motif']}`));
+            const valid = globalData[c] ? globalData[c].filter(cell => !excludedSet.has(`${c}|${cell['Surface (cm²)']}|${cell['Motif']}`)) : [];
             valid.forEach(cell => {
                 let s = cell['Surface (cm²)'];
                 if (!surfs[s]) surfs[s] = [];
@@ -816,7 +1607,7 @@
         conditions.forEach((c, idx) => {
             let start = idx * (COL_PER_COND + 1);
             grid[r0][start] = c.replace(/_/g, ' ');
-            ['Voc (V)','Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)','Number of cells'].forEach((h, i) => grid[r0][start+1+i] = h);
+            [conditionColumnName,'Jsc (mA/cm²)','FF (%)','PCE (%)','Rserie (Ω.cm²)','Rshunt (Ω.cm²)','Rserie (Ω)','Rshunt (Ω)','Surface (cm²)','Number of cells'].forEach((h, i) => grid[r0][start+1+i] = h); 
         });
 
         for (let i = 0; i < maxSurfs; i++) {
@@ -826,7 +1617,6 @@
                 let info = groupMap[c];
                 if (i < info.sortedS.length) {
                     let s = info.sortedS[i], list = info.surfs[s];
-                    
                     const vS = calcStats(list.map(x => x['Voc (V)']));
                     const jS = calcStats(list.map(x => x['Jsc (mA/cm²)']));
                     const fS = calcStats(list.map(x => x['FF (%)']));
@@ -901,9 +1691,268 @@
             });
         }
 
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(["\uFEFF" + grid.map(r => r.join('\t')).join('\n')], {type:'text/csv'})); a.download = "Complete Recap.csv"; a.click();
+        const a = document.createElement('a');
+        const url = URL.createObjectURL(new Blob(["\uFEFF" + grid.map(r => r.join('\t')).join('\n')], {type:'text/csv'}));
+        a.href = url; a.download = "Complete Recap.csv"; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         log("Filtered Complete Recap exported.", "success");
     };
+
+
+// =========================================================
+// Export individuel de graphe (un bouton par graphe, en survol)
+// - HTTPS (ex: GitHub Pages) → copie le PNG dans le presse-papier
+// - file:// (local)          → téléchargement PNG classique
+// =========================================================
+async function exportSingleGraph(graphId) {
+    const graphDiv = document.getElementById(graphId);
+    if (!graphDiv || !graphDiv.data || graphDiv.data.length === 0) {
+        log(`Cannot export ${graphId}: no data available.`, '#e74c3c');
+        return;
+    }
+
+    const btn = document.querySelector(`.plot-export-btn[onclick*="${graphId}"]`);
+    const originalContent = btn ? btn.innerHTML : '⬇';
+
+    // Verrouiller le bouton pendant l'opération
+    if (btn) { btn.disabled = true; btn.innerHTML = '…'; }
+
+    try {
+        const isHttps = location.protocol === 'https:';
+
+        // Générer le PNG via exportGraphWithStyle (retourne un dataURL base64)
+        const dataUrl = await exportGraphWithStyle(graphId, graphId, { returnOnly: true });
+
+        if (isHttps) {
+            // ── Mode GitHub Pages : copie dans le presse-papier ──────────
+            // Convertir le dataURL en Blob
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+            // Feedback vert ✓ pendant 1.5s
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '✓';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = originalContent;
+                    btn.classList.remove('copied');
+                }, 1500);
+            }
+            log(`Graph copied to clipboard: ${graphId}`, 'success');
+
+        } else {
+            // ── Mode local (file://) : téléchargement classique ──────────
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `${graphId}.png`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            // Feedback bleu ⬇ animé pendant 1s
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '⬇';
+                btn.classList.add('downloading');
+                setTimeout(() => {
+                    btn.classList.remove('downloading');
+                }, 1000);
+            }
+            log(`Graph downloaded: ${graphId}`, 'success');
+        }
+
+    } catch(e) {
+        console.error(e);
+        log(`Error exporting ${graphId}: ${e.message}`, '#e74c3c');
+        if (btn) { btn.disabled = false; btn.innerHTML = originalContent; }
+    }
+}
+
+// Exporter un graphe avec style forcé (LOGIQUE ORIGINALE DE 1.5.3)
+
+// --- Exporter un graphe avec la fonction native de Plotly (VERSION 1.5.5_v7) ---
+
+// --- Exporter un graphe avec scaling proportionnel et fond transparent (VERSION 1.5.5_v12) ---
+// Corrige : ticks mineurs, shapes (axes X=0/Y=0 du J-V), markers (scatter dans box plots),
+// longueur des traits dans la légende (legend.itemwidth), et axes secondaires (xaxis2/yaxis2).
+async function exportGraphWithStyle(graphId, filename, options = {}) {
+    const { returnOnly = false } = options;
+    const graphDiv = document.getElementById(graphId);
+    if (!graphDiv) {
+        console.error(`Graph ${graphId} not found!`);
+        return Promise.resolve(null);
+    }
+
+    if (!graphDiv.data || graphDiv.data.length === 0) {
+        alert(`Cannot export ${graphId}: no data available. Please ensure the graph is properly loaded.`);
+        return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+        // Sauvegarder l'état original
+        const originalLayout = JSON.parse(JSON.stringify(graphDiv.layout));
+        const originalData = JSON.parse(JSON.stringify(graphDiv.data));
+
+        // Taille cible pour l'export
+        const exportWidth = 2606;
+        const exportHeight = 2000;
+
+        // Taille actuelle du graphe à l'écran
+        const screenWidth = graphDiv.clientWidth || 800;
+        const screenHeight = graphDiv.clientHeight || 600;
+
+        // Facteur de scaling
+        const scaleFactor = Math.min(exportWidth / screenWidth, exportHeight / screenHeight);
+        // Facteur de réduction pour uniformiser et diminuer les épaisseurs de 30%
+        const thicknessFactor = 0.7;
+
+        // Helper : scaler un objet "axis" (xaxis, yaxis, xaxis2, yaxis2) en préservant
+        // toutes ses propriétés et en multipliant les épaisseurs / tailles par scaleFactor.
+        // Les épaisseurs sont ensuite réduites de 30% via thicknessFactor.
+        // Gère aussi le sous-objet "minor" (ticks mineurs) qui était ignoré auparavant.
+        const scaleAxis = (axis) => {
+            if (!axis) return axis;
+            const scaled = {
+                ...axis,
+                linewidth: (axis.linewidth || 1) * scaleFactor * thicknessFactor,
+                tickwidth: (axis.tickwidth || 1) * scaleFactor * thicknessFactor,
+                ticklen: (axis.ticklen || 5) * scaleFactor,
+                title: {
+                    ...axis.title,
+                    font: {
+                        ...axis.title?.font,
+                        size: (axis.title?.font?.size || 12) * scaleFactor
+                    }
+                },
+                tickfont: {
+                    ...axis.tickfont,
+                    size: (axis.tickfont?.size || 12) * scaleFactor
+                }
+            };
+            // Scaling du sous-objet "minor" (ticks mineurs) si présent
+            if (axis.minor) {
+                scaled.minor = {
+                    ...axis.minor,
+                    tickwidth: (axis.minor.tickwidth || 1) * scaleFactor * thicknessFactor,
+                    ticklen: (axis.minor.ticklen || 3) * scaleFactor
+                };
+            }
+            return scaled;
+        };
+
+        // Construction du nouveau layout
+        const newLayout = {
+            ...originalLayout,
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            width: 1700,
+            height: 1400,
+            margin: { l: 453, r: 453, t: 300, b: 300 },
+            xaxis: scaleAxis(originalLayout.xaxis),
+            yaxis: scaleAxis(originalLayout.yaxis),
+            font: {
+                ...originalLayout.font,
+                size: (originalLayout.font?.size || 12) * scaleFactor
+            },
+            legend: {
+                ...originalLayout.legend,
+                font: {
+                    ...originalLayout.legend?.font,
+                    size: (originalLayout.legend?.font?.size || 12) * scaleFactor
+                },
+                // Longueur des traits dans la légende, scalée proportionnellement.
+                // Plotly impose un minimum de 30 pour itemwidth.
+                itemwidth: Math.max(30, (originalLayout.legend?.itemwidth || 30) * scaleFactor)
+            }
+        };
+
+        // Axes secondaires (utilisés par EQE pour Integrated Jsc) : seulement s'ils existent
+        if (originalLayout.xaxis2) {
+            newLayout.xaxis2 = scaleAxis(originalLayout.xaxis2);
+        }
+        if (originalLayout.yaxis2) {
+            newLayout.yaxis2 = scaleAxis(originalLayout.yaxis2);
+        }
+
+        // Scaling des shapes (lignes X=0 et Y=0 du graphe J-V, et toute autre shape éventuelle)
+        // Les épaisseurs des shapes sont aussi réduites de 30%
+        if (Array.isArray(originalLayout.shapes) && originalLayout.shapes.length > 0) {
+            newLayout.shapes = originalLayout.shapes.map(shape => ({
+                ...shape,
+                line: shape.line ? {
+                    ...shape.line,
+                    width: (shape.line.width || 1) * scaleFactor * thicknessFactor
+                } : shape.line
+            }));
+        }
+
+        // Scaling des traces : line.width ET marker.size (+ marker.line.width si présent)
+        // Le scaling des markers est essentiel pour les points scatter des box plots (Statistics).
+        // Les épaisseurs des lignes (line.width et marker.line.width) sont réduites de 30%.
+        const updatedData = graphDiv.data.map(trace => {
+            const newTrace = { ...trace };
+            if (trace.line) {
+                newTrace.line = {
+                    ...trace.line,
+                    width: (trace.line.width || 1) * scaleFactor * thicknessFactor
+                };
+            }
+            if (trace.marker) {
+                newTrace.marker = {
+                    ...trace.marker,
+                    size: (trace.marker.size || 6) * scaleFactor
+                };
+                if (trace.marker.line) {
+                    newTrace.marker.line = {
+                        ...trace.marker.line,
+                        width: (trace.marker.line.width || 1) * scaleFactor * thicknessFactor
+                    };
+                }
+            }
+            return newTrace;
+        });
+
+        // Créer un conteneur caché pour l'export
+        const hiddenDiv = document.createElement('div');
+        hiddenDiv.style.position = 'absolute';
+        hiddenDiv.style.left = '-9999px';
+        hiddenDiv.id = `hidden-export-${graphId}`;
+        document.body.appendChild(hiddenDiv);
+
+        // Recréer le graphe dans le conteneur caché avec le scaling
+        Plotly.newPlot(hiddenDiv.id, updatedData, newLayout, { responsive: true, displayModeBar: false });
+
+        // Exporter après un délai (laisse le temps à Plotly de rendre)
+        setTimeout(async () => {
+            let imageDataUrl = null;
+            try {
+                imageDataUrl = await Plotly.toImage(hiddenDiv.id, {
+                    format: 'png',
+                    width: exportWidth,
+                    height: exportHeight
+                });
+                if (returnOnly) {
+                    // Mode "retourner le dataURL" : pas de téléchargement, on résout avec la valeur
+                    resolve(imageDataUrl);
+                } else {
+                    // Mode "téléchargement direct" (appel depuis PDF export, etc.)
+                    const link = document.createElement('a');
+                    link.href = imageDataUrl;
+                    link.download = filename || graphId;
+                    link.click();
+                    resolve(imageDataUrl);
+                }
+            } catch (error) {
+                console.error('Error generating image:', error);
+                resolve(null);
+            } finally {
+                try { Plotly.purge(hiddenDiv.id); } catch(e) { /* ignore */ }
+                if (hiddenDiv.parentNode) document.body.removeChild(hiddenDiv);
+            }
+        }, 500);
+    });
+}
 </script>
 </body>
 </html>
